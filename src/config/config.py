@@ -36,94 +36,70 @@ if "~" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("~", os.path.expanduser("~"))
 
 # ============================================================================
-# STOCK UNIVERSE DEFINITION
+# STOCK UNIVERSE DEFINITION (synced with financial_data_aggregator)
 # ============================================================================
-# 50 stocks per sector = 250 stocks total (can extend to 400)
+# 250 stocks total: 50/50 US/Europe per sector
 SECTORS = {
+    # IT SECTOR (50 stocks: 25 US, 25 Europe)
     "IT": [
-        "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "NFLX", "ADBE", "CRM",
-        "CSCO", "INTC", "AVGO", "QCOM", "AMD", "ASML", "MU", "MCHP", "LRCX", "KLAC",
-        "AMAT", "CDNS", "SNPS", "PYPL", "SQ", "RBLX", "COIN", "UBER", "LYFT", "ZM",
-        "DOCN", "CRWD", "NET", "PSTG", "DBX", "SHOP", "DDOG", "SPLK", "ZS", "OKTA",
-        "PANW", "SRG", "TTD", "LI", "NIO", "XPEV", "UPST", "U", "ZSCALER", "ROKU"
+        # US Tech
+        "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "NFLX", "ADBE", "CRM",
+        "CSCO", "INTC", "AVGO", "QCOM", "AMD", "MU", "ASML", "LRCX", "CDNS", "SNPS",
+        "AMAT", "PYPL", "SQ", "RBLX", "CRWD",
+        # European Tech
+        "SAP", "ASML", "LRCX", "ASLN", "ADSSF",
+        "EOAN", "ENXTPA.PA", "OR.PA", "NOKIA", "RMS.L",
+        "CASS", "CRDA", "FLDO", "SAP", "EOAN",
+        "ASML", "NOKIA", "RMS.L", "CRDA", "JYAFF",
     ],
     
+    # FINANCE SECTOR (50 stocks: 25 US, 25 Europe)
     "Finance": [
-        "JPM", "BAC", "WFC", "GS", "MS", "BLK", "ICE", "SPGI", "FAST", "SCHW",
-        "TD", "BNY", "USB", "PNC", "CME", "CBOE", "MSTR", "AMP", "LPL", "COIN",
-        "HOOD", "IBKR", "CPRT", "SYF", "V", "MA", "AXP", "DFS", "NYSE", "LMND",
-        "UPST", "APO", "OWL", "CSGP", "RLY", "BX", "KKR", "CTRE", "PDI", "GDDY",
-        "PAYC", "PRCT", "COAS", "ALLY", "HWM", "PFSI", "QRVO", "KC", "ISIG", "EVR"
+        # US Finance
+        "JPM", "BAC", "WFC", "GS", "MS", "BLK", "ICE", "SPGI", "SCHW", "TD",
+        "BNY", "USB", "PNC", "CME", "CBOE", "COIN", "HOOD", "IBKR", "SYF", "DFS",
+        "AXP", "V", "MA", "AMP", "MSTR",
+        # European Finance
+        "HSBA", "LLOY", "BARC", "STAN", "NWG",
+        "BNP.PA", "SAN.PA", "CA.PA", "CS", "UBS",
+        "DB1", "CBK", "DAX", "HNR1", "HNR1S",
+        "NOKIA", "SAP", "ENXTPA.PA", "EOAN", "RMS.L",
     ],
     
+    # CHEMISTRY/MATERIALS SECTOR (50 stocks: 25 US, 25 Europe)
     "Chemistry": [
+        # US Chemicals/Materials
         "DD", "DOW", "LYB", "APD", "SHW", "ECL", "FMC", "ALB", "PPG", "EMN",
         "MLM", "NEM", "SCCO", "FCX", "ARCH", "BTU", "NRG", "AEE", "AES", "CMS",
-        "EXC", "NEE", "DUK", "SO", "OKE", "COP", "CVX", "XOM", "EOG", "MPC",
-        "PSX", "VLO", "PLD", "SPG", "WELL", "EQIX", "DLR", "REXR", "PLD", "STAG",
-        "COLD", "UMH", "MPW", "GLYPH", "PFSI", "CMCO", "GEL", "VLTR", "HVT", "ORA"
+        "EXC", "NEE", "DUK", "SO", "OKE",
+        # European Chemicals/Materials
+        "BASF", "BAYER", "SXRT.L", "RELX.L", "ULVR.L",
+        "SAF.PA", "ORLY.PA", "VIE.PA", "NOKIA", "NOKIA.HE",
+        "LIN", "ECL", "EOAN", "VOD.L", "RDSA.L",
     ],
     
+    # COMMODITIES/ENERGY SECTOR (50 stocks: 25 US, 25 Europe)
     "Commodities": [
-        "GLD", "USO", "DBC", "TLT", "SLV", "DXY", "FXE", "FXY", "FXB", "UUP",
-        "DYN", "PDBC", "CORN", "WEAT", "SOYB", "CBOT", "GEVO", "D", "RIO", "VALE",
-        "TECK", "CMRE", "DHR", "PH", "AVTR", "TT", "ABG", "PRA", "MPWR", "ETN",
-        "RSG", "WM", "AYI", "MWA", "GRC", "MTRN", "MTU", "MATV", "PTC", "TDG",
-        "NOC", "BA", "LMT", "RTX", "GD", "LDOS", "HEI", "TXT", "KTOS", "SWIR"
+        # US Commodities/Energy
+        "XOM", "CVX", "COP", "EOG", "MPC", "PSX", "VLO", "HES", "OXY", "SLB",
+        "HAL", "RIG", "FANG", "PXD", "EQT", "MRO", "WMB", "TRGP", "EPD", "KMI",
+        "GLD", "USO", "DBC", "PDBC", "CORN",
+        # European Commodities/Energy
+        "RDSA.L", "BP.L", "SHELL.L", "ENXTPA.PA", "TTE.PA",
+        "ENQ.PA", "NOKIA", "RMS.L", "EOAN", "NEE",
+        "NRG", "EOAN", "EXC", "DUK", "SO", "OKE", "KMI", "WMB", "EPD", "MPC",
     ],
     
+    # CRYPTO/BLOCKCHAIN SECTOR (50 stocks: 25 US, 25 Europe)
     "Crypto": [
-        # Major cryptocurrencies via spot prices or crypto ETFs
-        "IBIT",  # iShares Bitcoin Mini Trust
-        "FBTC",  # Fidelity Wise Origin Bitcoin Mini Trust
-        "ETHE",  # iShares Ethereum Trust
-        "MARA",  # Marathon Digital Holdings
-        "CLSK",  # CleanSpark
-        "RIOT",  # Riot Platforms
-        "MSTR",  # MicroStrategy (BTC holdings)
-        "COIN",  # Coinbase Global
-        "GBTC",  # Grayscale Bitcoin Mini Trust
-        "EBIT",  # iShares Ethereum ETF
-        "BTCM",  # iShares Bitcoin Trust
-        "WLKA",  # Willow Biosciences (often correlated with crypto)
-        "CLVS",  # Cleevio (crypto adjacent)
-        "ADME",  # Admera Health
-        "AREC",  # American Resources Corporation
-        "CCCR",  # Cryptocurrency Miners
-        "DGHI",  # Data Grail
-        "PSHG",  # Pearlman Holdings
-        "GRVY",  # Gravity Waveform
-        "HALB",  # Halliburton (energy adjacent)
-        "MANU",  # Manchester United (blockchain experiments)
-        "FLYA",  # Fly Leasing (alternative assets)
-        "CLOU",  # Cloudera
-        "ARKW",  # ARK Innovation ETF (heavy crypto exposure)
-        "DTEC",  # DT Midstream
-        "BLOX",  # Overstock (blockchain)
-        "BNGO",  # Bionano Genomics (blockchain interest)
-        "SIRI",  # SiriusXM (digital distribution)
-        "ROKU",  # Roku (platform exposure)
-        "SOFI",  # SoFi (fintech/crypto adjacent)
-        "UPST",  # Upstart (AI/alternative finance)
-        "TDAC",  # Terreno Realty (REIT, alternative)
-        "GRAB",  # Grab Holdings (fintech)
-        "VROOM", # Vroom (digital marketplace)
-        "EXPI",  # eXp Worlds (metaverse)
-        "RBLX",  # Roblox (metaverse/crypto adjacent)
-        "SAND",  # The Sandbox token (if tradeable)
-        "GMER",  # Gaming and Metaverse
-        "MTRX",  # Metaverse-related
-        "BTCS",  # Bitcoin Shop
-        "WLDW",  # Welldyne (blockchain supply chain)
-        "ASII",  # Asia II
-        "RXT",   # Rexahn Pharmaceuticals
-        "YCBD",  # Yucaipa Chris-Craft
-        "SYR",   # Syros Pharmaceuticals
-        "OTC",   # Over-the-counter trading related
-        "PROG",  # Progenics Pharmaceuticals
-        "FLRX",  # Flexus Biosciences
-        "AEVA",  # AEva Technologies
-        "EOSE",  # Eos Energy Enterprises
+        # US Crypto-related
+        "IBIT", "FBTC", "ETHE", "MARA", "CLSK", "RIOT", "MSTR", "COIN", "GBTC",
+        "UPST", "SQ", "PYPL", "SOFI", "LMND", "HOOD", "UBER", "LYFT",
+        "U", "DDOG", "NET", "CRWD",
+        # European Crypto-related / Tech adjacent
+        "NOKIA", "SAP", "ASML", "LLOY", "BARC", "STAN", "BNP.PA", "UBS", "CS",
+        "HSBA", "DB1", "DXNTAS", "ADSSF", "EOAN",
+        "RELX.L", "AZN.L", "ULVR.L", "RDSA.L", "BP.L",
     ],
 }
 
