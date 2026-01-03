@@ -1,3 +1,7 @@
+# Documentation (markdown files)
+*.md
+!README.md
+
 # Python
 __pycache__/
 *.py[cod]
