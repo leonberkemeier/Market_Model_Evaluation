@@ -82,18 +82,21 @@ class DataLoader:
             ticker: Stock ticker symbol
             
         Returns:
-            Dict with company info (name, sector, industry, exchange) or None
+            Dict with company info (name, sector, industry, exchange_id) or None
         """
         query = """
             SELECT 
-                company_id,
-                ticker,
-                company_name,
-                sector,
-                industry,
-                exchange_id
-            FROM dim_company
-            WHERE ticker = :ticker
+                c.company_id,
+                c.ticker,
+                c.company_name,
+                c.sector,
+                c.industry,
+                c.exchange_id,
+                e.exchange_code,
+                e.exchange_name
+            FROM dim_company c
+            LEFT JOIN dim_exchange e ON c.exchange_id = e.exchange_id
+            WHERE c.ticker = :ticker
         """
         
         try:
@@ -108,6 +111,8 @@ class DataLoader:
                     "sector": result[3],
                     "industry": result[4],
                     "exchange_id": result[5],
+                    "exchange_code": result[6],
+                    "exchange_name": result[7],
                 }
             else:
                 logger.warning(f"No metadata found for {ticker}")
