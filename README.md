@@ -52,7 +52,9 @@ model_regime_comparison/
 │   ├── feature_engineering/         # Feature computation
 │   │   ├── __init__.py
 │   │   ├── base_calculator.py       # Abstract base class
-│   │   └── technical_features.py    # TODO: Implement
+│   │   ├── technical_features.py    # 17 technical indicators
+│   │   ├── fundamental_features.py  # Company metrics & growth
+│   │   └── feature_aggregator.py    # Caching & batch computation
 │   ├── scorers/                     # Model implementations
 │   │   ├── __init__.py
 │   │   ├── base_scorer.py           # Abstract base class
@@ -73,7 +75,7 @@ model_regime_comparison/
 │   │   └── validator.py             # TODO: Implement
 │   ├── data/                        # Data loading
 │   │   ├── __init__.py
-│   │   ├── data_loader.py           # TODO: Implement
+│   │   ├── data_loader.py           # ✅ Query financial_data_aggregator DB
 │   │   ├── universe_builder.py      # TODO: Implement
 │   │   └── cache.py                 # TODO: Implement
 │   └── analysis/                    # Analysis & visualization
@@ -96,7 +98,9 @@ model_regime_comparison/
 │   ├── test_scorers.py
 │   ├── test_kelly.py
 │   ├── test_backtest.py
-│   └── test_integration.py
+│   ├── test_integration.py
+│   ├── test_data_loader.py          # ✅ Data loading tests
+│   └── test_features.py             # ✅ Feature engineering tests (29 tests)
 ├── notebooks/                       # Jupyter notebooks
 │   ├── 01_eda.ipynb                # Exploratory analysis
 │   ├── 02_training.ipynb           # Model training
@@ -182,44 +186,50 @@ We use **fractional Kelly (0.25)** for safety and variance reduction.
 
 ## Implemented Components
 
-✅ Configuration system (`config/config.py`)
-✅ Data structures (`src/data_structures.py`)
-✅ Base classes for extensibility
-✅ Kelly Criterion optimizer (`src/portfolio/kelly_optimizer.py`)
-✅ Placeholder scorer implementations
+✅ **Phase 1: Foundation** (Complete)
+- Configuration system (`config/config.py`)
+- Data structures (`src/data_structures.py`)
+- Base classes for extensibility
+- Kelly Criterion optimizer (`src/portfolio/kelly_optimizer.py`)
+- Data loader (`src/data/data_loader.py`) - connects to financial_data_aggregator DB
+- 250-stock universe (50 US/Europe per sector: IT, Finance, Chemistry, Commodities, Crypto)
+- Placeholder scorer implementations
+
+✅ **Phase 2: Feature Engineering** (Complete)
+- Technical Features (`src/feature_engineering/technical_features.py`)
+  - 17 features: Momentum (5d/20d/60d), Volatility (20d/60d), RSI, MACD, Bollinger Bands, Price-to-SMA, Volume trend
+- Fundamental Features (`src/feature_engineering/fundamental_features.py`)
+  - 15+ features: Company metadata, SEC filing metrics, financial health, growth metrics, sector rotation
+- Feature Aggregator (`src/feature_engineering/feature_aggregator.py`)
+  - Disk-based caching, batch computation, date-based rolling windows
+- Comprehensive test suite (29 tests, all passing)
 
 ## TODO: Next Steps
 
-### Phase 1: Data Pipeline (Priority 1)
-- [ ] Implement `src/data/data_loader.py` - Query financial_data_aggregator DB
-- [ ] Implement `src/data/universe_builder.py` - Filter 400-stock universe
-- [ ] Implement technical feature calculator
-- [ ] Unit tests for data loading
-
-### Phase 2: Model Scorers (Priority 2)
-- [ ] Implement `src/scorers/linear_scorer.py`
-- [ ] Implement `src/scorers/cnn_scorer.py`
-- [ ] Implement `src/scorers/xgboost_scorer.py`
-- [ ] Implement `src/scorers/llm_scorer.py` with RAG integration
+### Phase 3: Model Scorers (Priority 1)
+- [ ] Implement `src/scorers/linear_scorer.py` - scikit-learn linear regression baseline
+- [ ] Implement `src/scorers/cnn_scorer.py` - TensorFlow CNN for temporal patterns
+- [ ] Implement `src/scorers/xgboost_scorer.py` - Gradient boosting with technical+fundamental features
+- [ ] Implement `src/scorers/llm_scorer.py` - RAG integration with SEC filings
 - [ ] Unit tests for each scorer
 
-### Phase 3: Backtest Engine (Priority 3)
-- [ ] Implement full `src/backtest/engine.py`
-- [ ] Implement `src/backtest/performance_metrics.py`
-- [ ] Implement portfolio manager
+### Phase 4: Backtest Engine (Priority 2)
+- [ ] Implement full `src/backtest/engine.py` - Daily scoring, weekly rebalancing
+- [ ] Implement `src/backtest/performance_metrics.py` - Sharpe, Sortino, max drawdown, etc.
+- [ ] Implement portfolio manager - Position tracking, rebalancing logic
 - [ ] Unit tests for backtest logic
 
-### Phase 4: Analysis & Visualization (Priority 4)
-- [ ] Implement specialization heatmap
-- [ ] Implement power law scatter plot
-- [ ] Implement comparison metrics table
-- [ ] Create Jupyter notebooks
+### Phase 5: Analysis & Visualization (Priority 3)
+- [ ] Implement specialization heatmap (sector × model strengths)
+- [ ] Implement power law scatter plot (win rate vs payoff)
+- [ ] Implement comparison metrics table (model × metric)
+- [ ] Create Jupyter notebooks for exploration
 
-### Phase 5: Integration & Polish (Priority 5)
-- [ ] Integration tests
+### Phase 6: Integration & Polish (Priority 4)
+- [ ] Integration tests across all components
 - [ ] Optimize performance (caching, parallelization)
-- [ ] Documentation
-- [ ] Example notebooks
+- [ ] Full documentation and docstrings
+- [ ] Example notebooks and guides
 
 ## Testing
 
