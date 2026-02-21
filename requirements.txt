@@ -13,6 +13,7 @@ xgboost>=1.7.0
 tensorflow>=2.12.0
 keras>=2.12.0
 shap>=0.42.0
+hmmlearn>=0.3.0  # Hidden Markov Models for regime detection
 
 # LLM & RAG (from financial_data_aggregator)
 chromadb>=0.3.0
