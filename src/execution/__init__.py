@@ -11,6 +11,7 @@ from .portfolio_manager import (
     SentinelPortfolioManager,
     PositionTarget
 )
+from .scheduler import SentinelScheduler
 
 __all__ = [
     "TradingSimulatorClient",
@@ -19,5 +20,6 @@ __all__ = [
     "Portfolio",
     "PerformanceMetrics",
     "SentinelPortfolioManager",
-    "PositionTarget"
+    "PositionTarget",
+    "SentinelScheduler"
 ]

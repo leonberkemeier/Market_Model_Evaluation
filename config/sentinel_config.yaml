@@ -1,0 +1,168 @@
+# Sentinel Pipeline Configuration
+# ================================
+
+# Trading Simulator API Configuration
+# ------------------------------------
+trading_simulator:
+  base_url: "http://localhost:8000"
+  timeout_seconds: 30
+  max_retries: 3
+
+# Portfolio Configuration
+# -----------------------
+portfolio:
+  initial_capital: 100000.0  # $100k starting capital
+  rebalance_frequency: "daily"  # daily, weekly, monthly
+  min_rebalance_threshold: 0.05  # Only rebalance if drift > 5%
+
+# Regime Detection (Layer II)
+# ---------------------------
+regime:
+  model_path: "models/hmm_regime_detector.pkl"
+  spy_data_path: "data/spy_prices.csv"  # Path to SPY price data
+  lookback_days: 252  # 1 year of trading days
+
+# Expert Models (Layer III)
+# -------------------------
+experts:
+  # Which sectors to trade
+  active_sectors:
+    - tech
+    - finance
+  
+  # Model paths (will be loaded at runtime)
+  models:
+    tech:
+      type: "xgboost"
+      path: "models/xgboost_tech_model.pkl"
+    finance:
+      type: "linear"
+      path: "models/linear_finance_model.pkl"
+    # Add more as models are trained
+    # crypto:
+    #   type: "cnn"
+    #   path: "models/cnn_crypto_model.pkl"
+    # commodities:
+    #   type: "linear"
+    #   path: "models/linear_commodities_model.pkl"
+    # cyclicals:
+    #   type: "xgboost"
+    #   path: "models/xgboost_cyclicals_model.pkl"
+
+# Sector Ticker Mappings
+# ----------------------
+sector_tickers:
+  tech:
+    - AAPL
+    - MSFT
+    - NVDA
+    - GOOGL
+    - META
+    - TSLA
+    - AMD
+    - INTC
+    - CRM
+    - ADBE
+  
+  finance:
+    - JPM
+    - BAC
+    - GS
+    - MS
+    - WFC
+    - C
+    - BLK
+    - AXP
+    - USB
+    - PNC
+  
+  crypto:
+    - BTC-USD
+    - ETH-USD
+    - SOL-USD
+    - BNB-USD
+    - ADA-USD
+  
+  commodities:
+    - GLD
+    - SLV
+    - USO
+    - DBC
+  
+  cyclicals:
+    - CAT
+    - DE
+    - BA
+    - HON
+    - MMM
+    - GE
+    - UPS
+    - FDX
+    - DAL
+    - UAL
+
+# Monte Carlo Simulation (Layer IV)
+# ---------------------------------
+monte_carlo:
+  n_simulations: 10000
+  random_seed: 42
+  volatility_multiplier: 1.0
+  # Regime-specific parameters
+  regime_params:
+    bull:
+      drift_adj: 1.0
+      vol_adj: 1.0
+    bear:
+      drift_adj: 0.8
+      vol_adj: 1.2
+    sideways:
+      drift_adj: 0.9
+      vol_adj: 0.9
+
+# Kelly Criterion (Layer IV)
+# --------------------------
+kelly:
+  max_position_size: 0.15  # Max 15% per position
+  use_fractional_kelly: true
+  fractional_multiplier: 0.5  # Use half-Kelly for safety
+  min_win_prob: 0.52  # Require >52% win probability
+  # Regime adjustments
+  regime_adjustments:
+    bull: 1.0
+    sideways: 0.7
+    bear: 0.5
+
+# Risk Management
+# ---------------
+risk:
+  max_portfolio_volatility: 0.20  # 20% annual volatility target
+  max_drawdown_stop: 0.20  # Stop trading if drawdown > 20%
+  min_sharpe_ratio: 0.5  # Minimum acceptable Sharpe
+  max_correlation: 0.7  # Maximum correlation between positions
+
+# Logging
+# -------
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_dir: "logs"
+  log_file: "sentinel_pipeline.log"
+  log_rotation: "daily"  # daily, weekly, monthly
+  log_retention_days: 30
+
+# Execution
+# ---------
+execution:
+  dry_run: false  # Set to true for testing without real trades
+  execution_time: "09:35"  # Market open + 5 min (EST)
+  market_hours_only: true
+  allow_fractional_shares: false
+  
+# Alerts
+# ------
+alerts:
+  enabled: false
+  email: null
+  slack_webhook: null
+  alert_on_errors: true
+  alert_on_large_moves: true
+  large_move_threshold: 0.10  # Alert if position moves >10%
