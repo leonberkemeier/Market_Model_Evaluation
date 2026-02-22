@@ -19,8 +19,8 @@ from src.execution.scheduler import SentinelScheduler
 from src.execution.api_client import TradingSimulatorClient
 from src.execution.portfolio_manager import SentinelPortfolioManager
 from src.regime.hmm_detector import HMMRegimeDetector
-from src.experts.linear_model import LinearExpert
-from src.experts.xgboost_model import XGBoostExpert
+from src.experts.linear_model import LinearModel
+from src.experts.xgboost_model import XGBoostModel
 from src.risk.monte_carlo import MonteCarloSimulator
 from src.risk.kelly_criterion import KellyCriterion
 
@@ -48,26 +48,17 @@ def test_pipeline_initialization():
     logger.info("Initializing portfolio manager...")
     portfolio_manager = SentinelPortfolioManager(
         api_client=api_client,
-        initial_capital=100000.0,
-        min_rebalance_threshold=0.05
+        portfolio_id=1,  # Test portfolio ID
+        rebalance_tolerance=0.05
     )
     
     logger.info("Initializing HMM regime detector...")
-    hmm_detector = HMMRegimeDetector(n_regimes=3)
+    hmm_detector = HMMRegimeDetector(n_states=3)
     
     logger.info("Initializing expert models...")
-    linear_expert = LinearExpert(
-        sector="finance",
-        ridge_alpha=1.0,
-        max_features=50
-    )
+    linear_expert = LinearModel(sector="finance")
     
-    xgboost_expert = XGBoostExpert(
-        sector="tech",
-        n_estimators=100,
-        max_depth=6,
-        learning_rate=0.01
-    )
+    xgboost_expert = XGBoostModel(sector="tech")
     
     sector_experts = {
         "finance": linear_expert,
@@ -75,18 +66,10 @@ def test_pipeline_initialization():
     }
     
     logger.info("Initializing Monte Carlo simulator...")
-    monte_carlo = MonteCarloSimulator(
-        n_simulations=10000,
-        random_seed=42
-    )
+    monte_carlo = MonteCarloSimulator(n_simulations=10000)
     
     logger.info("Initializing Kelly Criterion...")
-    kelly = KellyCriterion(
-        max_position_size=0.15,
-        use_fractional_kelly=True,
-        fractional_multiplier=0.5,
-        min_win_prob=0.52
-    )
+    kelly = KellyCriterion()
     
     logger.info("Initializing Sentinel scheduler...")
     scheduler = SentinelScheduler(
