@@ -1,0 +1,94 @@
+{
+  "creation_date": "2026-02-26T17:55:34.494984",
+  "sector": "finance",
+  "tickers": [
+    "JPM",
+    "BAC",
+    "GS",
+    "MS",
+    "WFC",
+    "C",
+    "BLK",
+    "AXP",
+    "USB",
+    "PNC"
+  ],
+  "n_tickers": 10,
+  "date_range": {
+    "start": "2019-01-01",
+    "end": "2024-12-31"
+  },
+  "splits": {
+    "train": {
+      "end_date": "2023-12-31",
+      "n_observations": 11580
+    },
+    "validation": {
+      "start_date": "2024-01-01",
+      "end_date": "2024-06-30",
+      "n_observations": 1240
+    },
+    "test": {
+      "start_date": "2024-07-01",
+      "end_date": "2024-12-31",
+      "n_observations": 980
+    }
+  },
+  "targets": {
+    "forward_return_5d": {
+      "forward_days": 5,
+      "clip_percentile": 99
+    },
+    "forward_return_30d": {
+      "forward_days": 30,
+      "clip_percentile": 99
+    }
+  },
+  "features": {
+    "n_features": 36,
+    "feature_names": [
+      "momentum_5d",
+      "momentum_20d",
+      "momentum_60d",
+      "volatility_20d",
+      "volatility_60d",
+      "rsi_14",
+      "macd_line",
+      "macd_signal",
+      "macd_histogram",
+      "bb_upper",
+      "bb_middle",
+      "bb_lower",
+      "bb_percent_b",
+      "price_to_sma_20",
+      "price_to_sma_50",
+      "price_to_sma_200",
+      "volume_trend",
+      "has_data",
+      "sector",
+      "industry",
+      "country",
+      "exchange",
+      "has_filings",
+      "avg_filing_size",
+      "filing_frequency",
+      "pe_ratio",
+      "debt_equity_ratio",
+      "current_ratio",
+      "roe",
+      "roa",
+      "asset_turnover",
+      "profit_margin",
+      "free_cash_flow_yield",
+      "revenue_growth",
+      "earnings_growth",
+      "sector_rotation"
+    ]
+  },
+  "statistics": {
+    "total_observations": 13800,
+    "train_observations": 11580,
+    "val_observations": 1240,
+    "test_observations": 980
+  }
+}

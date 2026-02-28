@@ -143,32 +143,55 @@ FEATURE_CACHE_DIR = DATA_DIR / "feature_cache"
 FEATURE_CACHE_DIR.mkdir(exist_ok=True)
 
 # ============================================================================
-# MODEL CONFIGURATION
+# RISK EVALUATION CONFIGURATION
 # ============================================================================
-# Linear Regression
-LINEAR_LOOKBACK_PERIOD = 252  # 1 year
-LINEAR_MIN_DATA_POINTS = 100
+# Lookback windows
+HISTORICAL_LOOKBACK = 252     # 1 year for historical evaluator
+GARCH_LOOKBACK = 504          # 2 years for GARCH fitting
+REGIME_LOOKBACK = 504         # 2 years for regime detection
+SHORT_VOL_WINDOW = 20         # Recent volatility window
 
-# CNN
-CNN_SEQUENCE_LENGTH = 60  # 60-day windows
-CNN_BATCH_SIZE = 32
-CNN_EPOCHS = 50
-CNN_VALIDATION_SPLIT = 0.2
-CNN_VOLATILITY_MULTIPLIER = 1.5
+# Risk-free rate (annualized, for Sharpe calculation)
+# Pull from fact_bond_price if available, otherwise use this default
+RISK_FREE_RATE = 0.05
 
-# XGBoost
-XGB_N_ESTIMATORS = 500
-XGB_MAX_DEPTH = 6
-XGB_LEARNING_RATE = 0.05
-XGB_SUBSAMPLE = 0.8
-XGB_COLSAMPLE_BYTREE = 0.8
+# Market benchmark ticker (for beta/correlation)
+BENCHMARK_TICKER = "SPY"
 
-# LLM + RAG
-LLM_CACHE_FREQUENCY = "monthly"  # Update catalysts monthly
-LLM_TOP_K_RAG_RESULTS = 5
-LLM_MODEL = "llama3.1:8b"
-LLM_EMBEDDING_MODEL = "nomic-embed-text"
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+# ============================================================================
+# STRATEGY CONFIGURATION
+# ============================================================================
+# Strategies to run in comparison
+STRATEGIES = {
+    "historical_kelly": {
+        "evaluator": "historical",
+        "lookback": HISTORICAL_LOOKBACK,
+        "description": "Historical risk stats → Kelly sizing",
+    },
+    "garch_kelly": {
+        "evaluator": "garch",
+        "lookback": GARCH_LOOKBACK,
+        "description": "GARCH volatility forecast → Kelly sizing",
+    },
+    "regime_kelly": {
+        "evaluator": "regime_conditional",
+        "lookback": REGIME_LOOKBACK,
+        "description": "Regime-conditional risk stats → Kelly sizing",
+    },
+    "equal_weight": {
+        "evaluator": None,
+        "description": "1/N equal weight (baseline)",
+    },
+    "risk_parity": {
+        "evaluator": None,
+        "description": "Inverse-volatility weighting (baseline)",
+    },
+}
+
+# Trading Simulator API (for sending signals)
+TRADING_SIMULATOR_URL = os.getenv(
+    "TRADING_SIMULATOR_URL", "http://localhost:8000"
+)
 
 # ============================================================================
 # LOGGING CONFIGURATION

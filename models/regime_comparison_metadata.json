@@ -1,0 +1,44 @@
+{
+  "target": "forward_return_30d",
+  "features": [
+    "momentum_5d",
+    "momentum_20d",
+    "momentum_60d",
+    "volatility_20d",
+    "volatility_60d",
+    "rsi_14",
+    "macd_line",
+    "macd_histogram",
+    "bb_lower",
+    "bb_percent_b",
+    "price_to_sma_200",
+    "volume_trend"
+  ],
+  "regimes": [
+    "bull",
+    "sideways",
+    "bear"
+  ],
+  "comparison": {
+    "Naive Mean": {
+      "test_rmse": 0.09529009128779385,
+      "test_mae": 0.07586488051058561,
+      "test_r2": -0.6772577046848236
+    },
+    "Regime-Naive Mean": {
+      "test_rmse": 0.09707292447055628,
+      "test_mae": 0.0774025403177484,
+      "test_r2": -0.7406062425326043
+    },
+    "Global XGBoost": {
+      "test_rmse": 0.11015075336413863,
+      "test_mae": 0.08975972655733391,
+      "test_r2": -1.241192978310261
+    },
+    "Regime-Conditioned XGBoost": {
+      "test_rmse": 0.1091769918514439,
+      "test_mae": 0.08929327573327354,
+      "test_r2": -1.201742662084186
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "model_name": "Lasso (\u03b1=0.01)",
+  "target": "forward_return_30d",
+  "n_features_original": 17,
+  "n_features_selected": 12,
+  "train_size": 11580,
+  "val_rmse": 0.06734985492433197,
+  "val_r2": -0.2647010541069592,
+  "test_rmse": 0.09036101769191336,
+  "test_r2": -0.43717541994712805
+}

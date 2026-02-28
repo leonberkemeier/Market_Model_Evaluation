@@ -1,0 +1,32 @@
+{
+  "selected_features": [
+    "momentum_5d",
+    "momentum_20d",
+    "momentum_60d",
+    "volatility_20d",
+    "volatility_60d",
+    "rsi_14",
+    "macd_line",
+    "macd_histogram",
+    "bb_lower",
+    "bb_percent_b",
+    "price_to_sma_200",
+    "volume_trend"
+  ],
+  "n_features": 12,
+  "dropped_high_corr": [
+    "bb_upper",
+    "bb_middle",
+    "macd_signal"
+  ],
+  "dropped_high_vif": [
+    "price_to_sma_20",
+    "price_to_sma_50"
+  ],
+  "dropped_weak": [],
+  "selection_params": {
+    "corr_threshold": 0.9,
+    "vif_threshold": 10.0,
+    "target_corr_min": 0.01
+  }
+}
