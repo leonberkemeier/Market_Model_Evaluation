@@ -14,6 +14,7 @@ import argparse
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
+import pandas as pd
 from loguru import logger
 
 # Add project root to path
@@ -126,6 +127,11 @@ def generate_rebalance_dates(
     """Generate rebalance dates between start and end."""
     dates = []
     current = start
+
+    # Advance past weekends so weekly steps don't permanently land on weekends
+    while current.weekday() >= 5:
+        current += timedelta(days=1)
+
     delta = {
         "daily": timedelta(days=1),
         "weekly": timedelta(weeks=1),
@@ -133,7 +139,6 @@ def generate_rebalance_dates(
     }.get(frequency, timedelta(weeks=1))
 
     while current <= end:
-        # Skip weekends
         if current.weekday() < 5:
             dates.append(current)
         current += delta
@@ -193,6 +198,39 @@ def main():
     if market_prices.empty:
         logger.warning(f"No benchmark data for {BENCHMARK_TICKER}, beta will default to 1.0")
         market_prices = None
+
+    # Load macro data for Bayesian pipeline
+    macro_name = args.macro or MACRO_FEATURE
+    logger.info(f"Loading macro feature: {macro_name}")
+    if macro_name == "VIX":
+        macro_feature = loader.load_vix(TRAINING_START_DATE, BACKTEST_END_DATE)
+    else:
+        macro_feature = loader.load_fedfunds(TRAINING_START_DATE, BACKTEST_END_DATE)
+
+    bond_yields = loader.load_bond_yields(TRAINING_START_DATE, BACKTEST_END_DATE)
+    bond_spread = (
+        bond_yields["spread_10y_2y"]
+        if not bond_yields.empty and "spread_10y_2y" in bond_yields.columns
+        else pd.Series(dtype=float)
+    )
+
+    # --- Robustness analysis mode ---
+    if args.robustness:
+        logger.info("Running robustness analysis: VIX vs FEDFUNDS")
+        from src.analysis.robustness import RobustnessAnalyzer
+        analyzer = RobustnessAnalyzer(
+            loader=loader,
+            universe=universe,
+            market_prices=market_prices,
+            bond_spread=bond_spread,
+        )
+        analyzer.run(
+            rebalance_dates=generate_rebalance_dates(
+                BACKTEST_START_DATE, BACKTEST_END_DATE, REBALANCE_FREQUENCY
+            ),
+            output_dir=str(RESULTS_DIR),
+        )
+        return
 
     if args.evaluate_only:
         logger.info("Step 2: Computing risk profiles (evaluate-only mode)")

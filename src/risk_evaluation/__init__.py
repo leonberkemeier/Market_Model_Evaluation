@@ -5,6 +5,7 @@ from .base_evaluator import BaseRiskEvaluator
 from .historical_evaluator import HistoricalEvaluator
 from .garch_evaluator import GARCHEvaluator
 from .regime_evaluator import RegimeConditionalEvaluator
+from .bayesian_evaluator import BayesianEvaluator, BayesianPosterior
 
 __all__ = [
     "RiskProfile",
@@ -12,4 +13,6 @@ __all__ = [
     "HistoricalEvaluator",
     "GARCHEvaluator",
     "RegimeConditionalEvaluator",
+    "BayesianEvaluator",
+    "BayesianPosterior",
 ]
