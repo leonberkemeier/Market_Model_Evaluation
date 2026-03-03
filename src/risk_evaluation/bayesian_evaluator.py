@@ -103,10 +103,14 @@ class BayesianEvaluator:
         hmm_states: np.ndarray,
         hmm_index: pd.DatetimeIndex,
         macro_feature: pd.Series,
-        bond_spread: pd.Series,
+        bond_spread: Optional[pd.Series] = None,
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Build the feature matrix and target for a single stock.
+
+        Bond spread is optional — if empty or None it is excluded from
+        the feature set rather than causing the entire matrix to be
+        dropped via an inner join on sparse data.
 
         Returns:
             (X, y): Feature DataFrame and target Series, aligned on common dates.
@@ -124,19 +128,32 @@ class BayesianEvaluator:
         for s in range(self.n_hmm_states):
             hmm_df[f"state_{s}"] = (hmm_states == s).astype(float)
 
-        # Macro feature
+        # Macro feature — use left join + ffill so sparse macro data
+        # does not discard return rows
         macro_df = macro_feature.rename("macro").to_frame()
-
-        # Bond spread
-        spread_df = bond_spread.rename("spread").to_frame()
 
         # Target: next-period return
         target = frac_diff_returns.shift(-1).rename("target")
 
-        # Join all features on common dates
+        # Join core features on common dates
         combined = lags_df.join(hmm_df, how="inner")
-        combined = combined.join(macro_df, how="inner")
-        combined = combined.join(spread_df, how="inner")
+        combined = combined.join(macro_df, how="left")
+        combined["macro"] = combined["macro"].ffill()
+
+        # Bond spread — only include when the series has meaningful data
+        _has_spread = (
+            bond_spread is not None
+            and isinstance(bond_spread, pd.Series)
+            and not bond_spread.empty
+            and bond_spread.notna().sum() >= 20
+        )
+        if _has_spread:
+            spread_df = bond_spread.rename("spread").to_frame()
+            combined = combined.join(spread_df, how="left")
+            combined["spread"] = combined["spread"].ffill()
+        else:
+            self.logger.debug("Bond spread excluded — insufficient data")
+
         combined = combined.join(target, how="inner")
 
         # Drop rows with any NaN (from lagging and shifting)
@@ -157,8 +174,8 @@ class BayesianEvaluator:
         hmm_states: np.ndarray,
         hmm_index: pd.DatetimeIndex,
         macro_feature: pd.Series,
-        bond_spread: pd.Series,
-        train_end: date,
+        bond_spread: Optional[pd.Series] = None,
+        train_end: date = date.today(),
     ) -> Optional[BayesianPosterior]:
         """
         Produce posterior predictive distribution for a single stock.
@@ -172,7 +189,7 @@ class BayesianEvaluator:
             hmm_states: HMM state ID array (from get_state_sequence).
             hmm_index: DatetimeIndex corresponding to hmm_states.
             macro_feature: VIX or FEDFUNDS series (date-indexed).
-            bond_spread: Bond yield spread series (date-indexed).
+            bond_spread: Bond yield spread series (optional, date-indexed).
             train_end: Last date to include in training (expanding window).
 
         Returns:
@@ -246,8 +263,8 @@ class BayesianEvaluator:
         frac_diff_dict: Dict[str, pd.Series],
         hmm_states_dict: Dict[str, Tuple[np.ndarray, pd.DatetimeIndex]],
         macro_feature: pd.Series,
-        bond_spread: pd.Series,
-        train_end: date,
+        bond_spread: Optional[pd.Series] = None,
+        train_end: date = date.today(),
     ) -> Dict[str, BayesianPosterior]:
         """
         Evaluate all stocks in the universe.
@@ -256,7 +273,7 @@ class BayesianEvaluator:
             frac_diff_dict: Dict of ticker -> frac-diff return series.
             hmm_states_dict: Dict of ticker -> (state_ids, index).
             macro_feature: VIX or FEDFUNDS series.
-            bond_spread: Bond yield spread series.
+            bond_spread: Bond yield spread series (optional).
             train_end: Expanding window cutoff date.
 
         Returns:

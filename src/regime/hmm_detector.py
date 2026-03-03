@@ -231,13 +231,25 @@ class HMMRegimeDetector:
 
         self.logger.info(f"Training HMM on frac-diff features: {features.shape}")
 
-        self.model = hmm.GaussianHMM(
-            n_components=self.n_states,
-            covariance_type="full",
-            n_iter=self.n_iter,
-            random_state=self.random_state,
-        )
-        self.model.fit(features)
+        # Try full covariance first; fall back to diag if data is
+        # ill-conditioned (common with small expanding windows).
+        for cov_type in ("full", "diag"):
+            try:
+                self.model = hmm.GaussianHMM(
+                    n_components=self.n_states,
+                    covariance_type=cov_type,
+                    n_iter=self.n_iter,
+                    random_state=self.random_state,
+                )
+                self.model.fit(features)
+                break  # success
+            except ValueError as e:
+                if cov_type == "full":
+                    self.logger.warning(
+                        f"HMM full covariance failed ({e}), falling back to diag"
+                    )
+                else:
+                    raise  # propagate if diag also fails
 
         # Label states by mean return (same logic as fit())
         states = self.model.predict(features)
