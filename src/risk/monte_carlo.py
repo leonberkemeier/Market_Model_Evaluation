@@ -367,6 +367,127 @@ class MonteCarloSimulator:
         return stats_dict
 
 
+# ============================================================================
+# BAYESIAN MONTE CARLO SIMULATOR
+# ============================================================================
+
+@dataclass
+class BayesianMCResult:
+    """Results from Bayesian Monte Carlo simulation with copula correlation."""
+    # Per-ticker simulated returns (n_sims × n_tickers)
+    simulated_returns: pd.DataFrame
+
+    # Portfolio-level aggregation
+    portfolio_returns: np.ndarray  # Weighted portfolio returns (n_sims,)
+    portfolio_weights: Dict[str, float]
+
+    # Portfolio risk metrics
+    mean_return: float
+    std_return: float
+    var_95: float
+    var_99: float
+    cvar_95: float
+    prob_loss: float
+
+    # Per-ticker risk metrics
+    ticker_var_95: Dict[str, float]
+    ticker_cvar_95: Dict[str, float]
+
+
+class BayesianMonteCarloSimulator:
+    """
+    Monte Carlo simulator that draws from Bayesian posteriors
+    correlated via a Student-t copula.
+
+    Replaces the old point-forecast Gaussian MC with a proper
+    joint distribution of returns.
+    """
+
+    def __init__(self, n_simulations: int = 10000, seed: int = 42):
+        self.n_simulations = n_simulations
+        self.seed = seed
+        logger.info(f"BayesianMonteCarloSimulator initialized: {n_simulations} sims")
+
+    def simulate_portfolio(
+        self,
+        posteriors: Dict[str, 'BayesianPosterior'],
+        copula: 'StudentTCopula',
+        weights: Optional[Dict[str, float]] = None,
+    ) -> BayesianMCResult:
+        """
+        Run copula-correlated MC simulation from Bayesian posteriors.
+
+        Args:
+            posteriors: Dict of ticker -> BayesianPosterior (from Tier 3).
+            copula: Fitted StudentTCopula.
+            weights: Portfolio weights. If None, equal weight.
+
+        Returns:
+            BayesianMCResult with portfolio and per-ticker risk metrics.
+        """
+        tickers = list(posteriors.keys())
+        n_positions = len(tickers)
+
+        if weights is None:
+            weights = {t: 1.0 / n_positions for t in tickers}
+
+        # Extract marginal params for copula sampling
+        marginal_params = {
+            t: (p.mu, p.sigma) for t, p in posteriors.items()
+        }
+
+        # Draw correlated samples
+        samples_df = copula.sample(
+            n_samples=self.n_simulations,
+            marginal_params=marginal_params,
+            seed=self.seed,
+        )
+
+        # Portfolio returns = weighted sum
+        portfolio_returns = np.zeros(self.n_simulations)
+        for ticker in tickers:
+            if ticker in samples_df.columns and ticker in weights:
+                portfolio_returns += weights[ticker] * samples_df[ticker].values
+
+        # Portfolio risk metrics
+        var_95 = float(np.percentile(portfolio_returns, 5))
+        var_99 = float(np.percentile(portfolio_returns, 1))
+        worst_5 = portfolio_returns[portfolio_returns <= var_95]
+        cvar_95 = float(np.mean(worst_5)) if len(worst_5) > 0 else var_95
+
+        # Per-ticker risk metrics
+        ticker_var_95 = {}
+        ticker_cvar_95 = {}
+        for ticker in tickers:
+            if ticker in samples_df.columns:
+                col = samples_df[ticker].values
+                tv = float(np.percentile(col, 5))
+                ticker_var_95[ticker] = tv
+                tw = col[col <= tv]
+                ticker_cvar_95[ticker] = float(np.mean(tw)) if len(tw) > 0 else tv
+
+        result = BayesianMCResult(
+            simulated_returns=samples_df,
+            portfolio_returns=portfolio_returns,
+            portfolio_weights=weights,
+            mean_return=float(np.mean(portfolio_returns)),
+            std_return=float(np.std(portfolio_returns)),
+            var_95=var_95,
+            var_99=var_99,
+            cvar_95=cvar_95,
+            prob_loss=float(np.mean(portfolio_returns < 0)),
+            ticker_var_95=ticker_var_95,
+            ticker_cvar_95=ticker_cvar_95,
+        )
+
+        logger.info(
+            f"Bayesian MC: mean={result.mean_return:.4f}, "
+            f"VaR95={result.var_95:.4f}, prob_loss={result.prob_loss:.2%}"
+        )
+
+        return result
+
+
 def calculate_var_backtest(
     predictions: pd.Series,
     actuals: pd.Series,

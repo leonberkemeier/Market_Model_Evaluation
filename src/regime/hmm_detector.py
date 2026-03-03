@@ -65,7 +65,7 @@ class HMMRegimeDetector:
         window: int = 20
     ) -> np.ndarray:
         """
-        Prepare features for HMM from price series.
+        Prepare features for HMM from price series (backward-compatible).
         
         Features:
         1. Returns (normalized)
@@ -94,6 +94,31 @@ class HMMRegimeDetector:
         ])
         
         return features
+
+    @staticmethod
+    def _prepare_features_from_inputs(
+        frac_diff_returns: pd.Series,
+        realized_vol: pd.Series,
+    ) -> Tuple[np.ndarray, pd.DatetimeIndex]:
+        """
+        Build feature matrix from pre-computed frac-diff returns and realized vol.
+
+        Used by Tier 2 of the Bayesian framework where Tier 1 (fractional
+        differentiation) has already been applied.
+
+        Args:
+            frac_diff_returns: Fractionally differentiated return series (date-indexed).
+            realized_vol: Rolling realized volatility series (date-indexed).
+
+        Returns:
+            (features_array, aligned_index): Feature matrix and its date index.
+        """
+        # Align on common dates
+        common = frac_diff_returns.index.intersection(realized_vol.index)
+        fd = frac_diff_returns.loc[common].values
+        rv = realized_vol.loc[common].values
+        features = np.column_stack([fd, rv])
+        return features, common
     
     def fit(
         self,
@@ -176,7 +201,100 @@ class HMMRegimeDetector:
             self._save_model()
         
         return self
-    
+
+    def fit_from_features(
+        self,
+        frac_diff_returns: pd.Series,
+        realized_vol: pd.Series,
+        verbose: bool = True,
+    ) -> 'HMMRegimeDetector':
+        """
+        Train HMM on pre-computed frac-diff returns and realized vol.
+
+        This is the Tier 2 entry point for the Bayesian framework:
+        Tier 1 (frac-diff) has already been applied upstream.
+
+        Args:
+            frac_diff_returns: Fractionally differentiated return series.
+            realized_vol: Rolling realized volatility series.
+            verbose: Print training progress.
+
+        Returns:
+            Self for method chaining.
+        """
+        if hmm is None:
+            raise ImportError("hmmlearn is required. Install with: pip install hmmlearn")
+
+        features, self._feature_index = self._prepare_features_from_inputs(
+            frac_diff_returns, realized_vol
+        )
+
+        self.logger.info(f"Training HMM on frac-diff features: {features.shape}")
+
+        self.model = hmm.GaussianHMM(
+            n_components=self.n_states,
+            covariance_type="full",
+            n_iter=self.n_iter,
+            random_state=self.random_state,
+        )
+        self.model.fit(features)
+
+        # Label states by mean return (same logic as fit())
+        states = self.model.predict(features)
+        state_means = []
+        for state_idx in range(self.n_states):
+            state_mask = states == state_idx
+            state_means.append(features[state_mask, 0].mean())
+
+        sorted_indices = np.argsort(state_means)
+        self.state_labels = {
+            sorted_indices[0]: "bear",
+            sorted_indices[1]: "sideways",
+            sorted_indices[2]: "bull",
+        }
+
+        if verbose:
+            for si, label in self.state_labels.items():
+                self.logger.info(
+                    f"  State {si} = {label.upper()}: mean_fd_return={state_means[si]:.6f}"
+                )
+
+        self.fitted = True
+        if self.model_path:
+            self._save_model()
+
+        return self
+
+    def get_state_sequence(
+        self,
+        frac_diff_returns: pd.Series,
+        realized_vol: pd.Series,
+    ) -> Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex]:
+        """
+        Predict full state sequence and probabilities for given features.
+
+        This is the primary output of Tier 2, consumed by Tier 3
+        (Bayesian evaluator) as a feature.
+
+        Args:
+            frac_diff_returns: Fractionally differentiated return series.
+            realized_vol: Rolling realized volatility series.
+
+        Returns:
+            (state_ids, state_probs, index):
+                - state_ids: array of integer state indices, shape (T,)
+                - state_probs: array of state probabilities, shape (T, n_states)
+                - index: DatetimeIndex aligned with the output
+        """
+        if not self.fitted:
+            raise ValueError("Model not fitted. Call fit() or fit_from_features() first.")
+
+        features, idx = self._prepare_features_from_inputs(frac_diff_returns, realized_vol)
+        state_ids = self.model.predict(features)
+        state_probs = self.model.predict_proba(features)
+
+        return state_ids, state_probs, idx
+
     def predict_regime(
         self,
         prices: pd.Series,

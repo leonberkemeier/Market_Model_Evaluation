@@ -28,14 +28,15 @@ from src.config.config import (
     HISTORICAL_LOOKBACK, GARCH_LOOKBACK, REGIME_LOOKBACK,
     RISK_FREE_RATE, SHORT_VOL_WINDOW,
     KELLY_FRACTION, MAX_KELLY_FRACTION, TARGET_NUM_POSITIONS,
-    ALL_TICKERS, RESULTS_DIR,
+    ALL_TICKERS, RESULTS_DIR, MACRO_FEATURE,
+    BAYESIAN_MC_N_SIMS,
 )
 from src.data.data_loader import DataLoader
 from src.risk_evaluation import (
     HistoricalEvaluator, GARCHEvaluator, RegimeConditionalEvaluator,
 )
 from src.risk.kelly_criterion import KellyCriterion
-from src.portfolio.strategy_runner import StrategyRunner
+from src.portfolio.strategy_runner import StrategyRunner, BayesianStrategyRunner
 from src.comparison.strategy_comparator import StrategyComparator
 
 
@@ -84,8 +85,10 @@ def build_evaluator(name: str):
     return None
 
 
-def build_strategy_runners() -> Dict[str, StrategyRunner]:
-    """Build StrategyRunner instances for all configured strategies."""
+def build_strategy_runners(
+    macro_feature_name: str = MACRO_FEATURE,
+) -> Dict[str, object]:
+    """Build strategy runners for all configured strategies."""
     kelly = KellyCriterion(
         max_position_size=MAX_KELLY_FRACTION,
         use_fractional_kelly=True,
@@ -94,16 +97,25 @@ def build_strategy_runners() -> Dict[str, StrategyRunner]:
 
     runners = {}
     for name, config in STRATEGIES.items():
-        evaluator = None
-        if config.get("evaluator"):
-            evaluator = build_evaluator(config["evaluator"])
+        if name == "bayesian_kelly":
+            # Bayesian pipeline uses its own runner
+            runners[name] = BayesianStrategyRunner(
+                macro_feature_name=macro_feature_name,
+                max_positions=TARGET_NUM_POSITIONS,
+                n_simulations=BAYESIAN_MC_N_SIMS,
+                fractional_kelly=KELLY_FRACTION,
+            )
+        else:
+            evaluator = None
+            if config.get("evaluator"):
+                evaluator = build_evaluator(config["evaluator"])
 
-        runners[name] = StrategyRunner(
-            strategy_name=name,
-            evaluator=evaluator,
-            kelly=kelly,
-            max_positions=TARGET_NUM_POSITIONS,
-        )
+            runners[name] = StrategyRunner(
+                strategy_name=name,
+                evaluator=evaluator,
+                kelly=kelly,
+                max_positions=TARGET_NUM_POSITIONS,
+            )
 
     return runners
 
@@ -144,6 +156,14 @@ def main():
         "--tickers", nargs="+", default=None,
         help="Override stock universe (e.g. AAPL MSFT GOOGL)"
     )
+    parser.add_argument(
+        "--robustness", action="store_true",
+        help="Run robustness analysis: compare VIX vs FEDFUNDS macro features"
+    )
+    parser.add_argument(
+        "--macro", type=str, default=None,
+        help="Override macro feature (VIX or FEDFUNDS)"
+    )
     args = parser.parse_args()
 
     setup_logging()
@@ -174,7 +194,6 @@ def main():
         logger.warning(f"No benchmark data for {BENCHMARK_TICKER}, beta will default to 1.0")
         market_prices = None
 
-    # --- Step 2: Evaluate only mode ---
     if args.evaluate_only:
         logger.info("Step 2: Computing risk profiles (evaluate-only mode)")
         evaluator = HistoricalEvaluator(
@@ -196,7 +215,7 @@ def main():
 
     # --- Step 3: Build strategies ---
     logger.info("Step 2: Building strategy runners")
-    runners = build_strategy_runners()
+    runners = build_strategy_runners(macro_feature_name=macro_name)
 
     if args.strategy:
         if args.strategy not in runners:
@@ -221,6 +240,8 @@ def main():
         universe=universe,
         rebalance_dates=rebalance_dates,
         market_prices=market_prices,
+        macro_feature=macro_feature,
+        bond_spread=bond_spread,
     )
 
     # --- Step 5: Report results ---

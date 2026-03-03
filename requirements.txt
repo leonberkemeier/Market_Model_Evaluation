@@ -14,6 +14,8 @@ tensorflow>=2.12.0
 keras>=2.12.0
 shap>=0.42.0
 hmmlearn>=0.3.0  # Hidden Markov Models for regime detection
+statsmodels>=0.14.0  # ADF test for fractional differentiation
+arch>=6.0.0  # GARCH volatility models
 
 # LLM & RAG (from financial_data_aggregator)
 chromadb>=0.3.0

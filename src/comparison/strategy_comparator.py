@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 from loguru import logger
 
-from ..portfolio.strategy_runner import StrategyRunner, AllocationResult
+from ..portfolio.strategy_runner import StrategyRunner, BayesianStrategyRunner, AllocationResult
 
 
 @dataclass
@@ -67,6 +67,8 @@ class StrategyComparator:
         universe: Dict[str, pd.DataFrame],
         rebalance_dates: List[date],
         market_prices: Optional[pd.DataFrame] = None,
+        macro_feature: Optional[pd.Series] = None,
+        bond_spread: Optional[pd.Series] = None,
     ) -> ComparisonResult:
         """
         Run all strategies across rebalance dates and compare.
@@ -75,6 +77,8 @@ class StrategyComparator:
             universe: Dict of ticker -> full price history DataFrame
             rebalance_dates: Dates on which to rebalance
             market_prices: Benchmark prices for beta calculations
+            macro_feature: VIX or FEDFUNDS series (for Bayesian strategies)
+            bond_spread: Bond yield spread series (for Bayesian strategies)
 
         Returns:
             ComparisonResult with metrics and equity curves
@@ -96,12 +100,21 @@ class StrategyComparator:
                 # Trim universe to data available up to rebal_date
                 trimmed = self._trim_universe(universe, rebal_date)
 
-                # Run strategy
-                allocation = runner.run(
-                    universe=trimmed,
-                    evaluation_date=rebal_date,
-                    market_prices=market_prices,
-                )
+                # Run strategy (Bayesian runners need extra args)
+                if isinstance(runner, BayesianStrategyRunner):
+                    allocation = runner.run(
+                        universe=trimmed,
+                        evaluation_date=rebal_date,
+                        macro_feature=macro_feature if macro_feature is not None else pd.Series(dtype=float),
+                        bond_spread=bond_spread if bond_spread is not None else pd.Series(dtype=float),
+                        market_prices=market_prices,
+                    )
+                else:
+                    allocation = runner.run(
+                        universe=trimmed,
+                        evaluation_date=rebal_date,
+                        market_prices=market_prices,
+                    )
                 allocations.append(allocation)
 
                 # Simulate returns until next rebalance

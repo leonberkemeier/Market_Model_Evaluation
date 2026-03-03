@@ -159,28 +159,62 @@ RISK_FREE_RATE = 0.05
 BENCHMARK_TICKER = "SPY"
 
 # ============================================================================
+# BAYESIAN FRAMEWORK CONFIGURATION (Tiered Architecture)
+# ============================================================================
+# Tier 1: Fractional Differentiation
+FRAC_DIFF_THRESHOLD = 1e-5    # Weight truncation threshold for frac-diff
+FRAC_DIFF_MAX_D = 1.0         # Maximum d to search
+FRAC_DIFF_STEP = 0.05         # Grid step for d search
+FRAC_DIFF_ADF_PVALUE = 0.05   # ADF p-value threshold for stationarity
+
+# Tier 2: HMM Context Engine
+HMM_N_STATES = 3              # Number of hidden states (bull/bear/sideways)
+HMM_N_ITER = 100              # EM iterations for HMM training
+HMM_VOL_WINDOW = 20           # Rolling window for realized vol input
+
+# Tier 3: Bayesian Inference
+BAYESIAN_N_LAGS = 5           # Number of lagged frac-diff returns as features
+BAYESIAN_CI_LEVEL = 0.95      # Credible interval level
+
+# Macro feature for Tier 3 (swappable for robustness tests)
+# Options: 'VIX', 'FEDFUNDS'
+MACRO_FEATURE = os.getenv("MACRO_FEATURE", "VIX")
+
+# Copula
+COPULA_DOF_MIN = 2            # Min degrees of freedom for Student-t copula
+COPULA_DOF_MAX = 30           # Max degrees of freedom for Student-t copula
+COPULA_DOF_STEP = 1           # Grid step for ν search
+
+# Monte Carlo
+BAYESIAN_MC_N_SIMS = 10000    # Number of simulations for Bayesian MC
+
+# ============================================================================
 # STRATEGY CONFIGURATION
 # ============================================================================
 # Strategies to run in comparison
 STRATEGIES = {
+    "bayesian_kelly": {
+        "evaluator": "bayesian",
+        "description": "Frac-diff → HMM → Bayesian Ridge → Copula MC → Bayesian Kelly",
+    },
+    "garch_kelly": {
+        "evaluator": "garch",
+        "lookback": GARCH_LOOKBACK,
+        "description": "GARCH volatility forecast → Kelly sizing (benchmark)",
+    },
+    "equal_weight": {
+        "evaluator": None,
+        "description": "1/N equal weight (baseline)",
+    },
     "historical_kelly": {
         "evaluator": "historical",
         "lookback": HISTORICAL_LOOKBACK,
         "description": "Historical risk stats → Kelly sizing",
     },
-    "garch_kelly": {
-        "evaluator": "garch",
-        "lookback": GARCH_LOOKBACK,
-        "description": "GARCH volatility forecast → Kelly sizing",
-    },
     "regime_kelly": {
         "evaluator": "regime_conditional",
         "lookback": REGIME_LOOKBACK,
         "description": "Regime-conditional risk stats → Kelly sizing",
-    },
-    "equal_weight": {
-        "evaluator": None,
-        "description": "1/N equal weight (baseline)",
     },
     "risk_parity": {
         "evaluator": None,

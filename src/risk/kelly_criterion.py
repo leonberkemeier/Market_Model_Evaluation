@@ -406,6 +406,173 @@ class KellyCriterion:
         }
 
 
+# ============================================================================
+# BAYESIAN KELLY CRITERION
+# ============================================================================
+
+@dataclass
+class BayesianKellyResult:
+    """Result from Bayesian Kelly sizing for a single stock."""
+    ticker: str
+    kelly_fraction: float       # Final position size after all adjustments
+    kelly_percentage: float     # As percentage
+
+    # Inputs from Bayesian posterior
+    mu: float                   # Posterior mean return
+    sigma: float                # Posterior std
+    raw_kelly: float            # μ / σ² (before adjustments)
+
+    # Adjustments
+    confidence_score: float     # 1 / (1 + ci_width), from BayesianPosterior
+    regime_multiplier: float
+    fractional_multiplier: float
+
+
+class BayesianKelly:
+    """
+    Bayesian Kelly Criterion using posterior predictive distributions.
+
+    Uses the continuous Kelly formula:  f* = μ / σ²
+    with a confidence haircut from the credible interval width:
+        final_f = f* × confidence_score × fractional_multiplier × regime_multiplier
+
+    The confidence_score = 1/(1 + ci_width) naturally shrinks positions
+    when the model is uncertain (wide credible intervals).
+    """
+
+    def __init__(
+        self,
+        max_position_size: float = 0.15,
+        fractional_multiplier: float = 0.25,
+    ):
+        self.max_position_size = max_position_size
+        self.fractional_multiplier = fractional_multiplier
+
+        # Regime multipliers (same as classic Kelly)
+        self.regime_multipliers = {
+            "bull": 1.0,
+            "sideways": 0.7,
+            "bear": 0.5,
+        }
+
+        logger.info(
+            f"BayesianKelly initialized: max_size={max_position_size:.2%}, "
+            f"frac_mult={fractional_multiplier}"
+        )
+
+    def calculate(
+        self,
+        posterior: 'BayesianPosterior',
+        regime: Optional[str] = None,
+    ) -> BayesianKellyResult:
+        """
+        Calculate Bayesian Kelly position size from a posterior.
+
+        Args:
+            posterior: BayesianPosterior from Tier 3.
+            regime: Current market regime for adjustment.
+
+        Returns:
+            BayesianKellyResult with final position size.
+        """
+        mu = posterior.mu
+        sigma = posterior.sigma
+
+        # Continuous Kelly: f* = μ / σ²
+        if sigma <= 0:
+            raw_kelly = 0.0
+        else:
+            raw_kelly = mu / (sigma ** 2)
+
+        # Cap negative Kelly at 0 (no short positions in this framework)
+        raw_kelly = max(0.0, raw_kelly)
+
+        # Apply confidence haircut
+        confidence = posterior.confidence_score
+
+        # Regime multiplier
+        regime_mult = self.regime_multipliers.get(regime, 1.0) if regime else 1.0
+
+        # Final fraction
+        final_f = (
+            raw_kelly
+            * confidence
+            * self.fractional_multiplier
+            * regime_mult
+        )
+
+        # Cap at max position size
+        final_f = min(final_f, self.max_position_size)
+
+        return BayesianKellyResult(
+            ticker=posterior.ticker,
+            kelly_fraction=final_f,
+            kelly_percentage=final_f * 100,
+            mu=mu,
+            sigma=sigma,
+            raw_kelly=raw_kelly,
+            confidence_score=confidence,
+            regime_multiplier=regime_mult,
+            fractional_multiplier=self.fractional_multiplier,
+        )
+
+    def calculate_portfolio(
+        self,
+        posteriors: Dict[str, 'BayesianPosterior'],
+        regime: Optional[str] = None,
+        normalize: bool = True,
+        max_positions: int = 20,
+        min_fraction: float = 0.005,
+    ) -> Dict[str, BayesianKellyResult]:
+        """
+        Calculate Bayesian Kelly sizes for a portfolio.
+
+        Args:
+            posteriors: Dict of ticker -> BayesianPosterior.
+            regime: Current market regime.
+            normalize: Normalize weights to sum to 1.0.
+            max_positions: Maximum number of positions.
+            min_fraction: Minimum Kelly fraction to include.
+
+        Returns:
+            Dict of ticker -> BayesianKellyResult.
+        """
+        results = {}
+        for ticker, posterior in posteriors.items():
+            result = self.calculate(posterior, regime)
+            if result.kelly_fraction >= min_fraction:
+                results[ticker] = result
+
+        # Take top N by Kelly fraction
+        if len(results) > max_positions:
+            sorted_r = sorted(
+                results.items(), key=lambda x: x[1].kelly_fraction, reverse=True
+            )
+            results = dict(sorted_r[:max_positions])
+
+        # Normalize to sum to 1.0
+        if normalize and results:
+            total = sum(r.kelly_fraction for r in results.values())
+            if total > 0:
+                normalized = {}
+                for ticker, r in results.items():
+                    norm_f = r.kelly_fraction / total
+                    normalized[ticker] = BayesianKellyResult(
+                        ticker=r.ticker,
+                        kelly_fraction=norm_f,
+                        kelly_percentage=norm_f * 100,
+                        mu=r.mu,
+                        sigma=r.sigma,
+                        raw_kelly=r.raw_kelly,
+                        confidence_score=r.confidence_score,
+                        regime_multiplier=r.regime_multiplier,
+                        fractional_multiplier=r.fractional_multiplier,
+                    )
+                results = normalized
+
+        return results
+
+
 def calculate_optimal_f(
     returns: np.ndarray,
     method: str = "kelly"
