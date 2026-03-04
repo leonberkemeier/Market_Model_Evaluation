@@ -1,6 +1,7 @@
 """Data loader for pulling from Financial Data Aggregator database."""
+import json
 from datetime import date
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine, text
@@ -390,6 +391,192 @@ class DataLoader:
         except Exception as e:
             logger.error(f"Error loading bond yields: {e}")
             return pd.DataFrame()
+
+    # ------------------------------------------------------------------
+    # Sentiment (fact_sentiment)
+    # ------------------------------------------------------------------
+
+    def ensure_sentiment_table(self):
+        """
+        Create the fact_sentiment table if it does not exist.
+
+        Follows the existing star-schema convention with FKs to
+        dim_company and dim_date.
+        """
+        ddl = """
+            CREATE TABLE IF NOT EXISTS fact_sentiment (
+                sentiment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id   INTEGER NOT NULL,
+                date_id      INTEGER NOT NULL,
+                sentiment_score REAL NOT NULL,
+                n_headlines  INTEGER NOT NULL DEFAULT 0,
+                raw_scores   TEXT,
+                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (company_id) REFERENCES dim_company(company_id),
+                FOREIGN KEY (date_id) REFERENCES dim_date(date_id),
+                UNIQUE(company_id, date_id)
+            )
+        """
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text(ddl))
+                conn.commit()
+            logger.info("fact_sentiment table ensured")
+        except Exception as e:
+            logger.error(f"Failed to create fact_sentiment: {e}")
+
+    def _resolve_company_id(self, ticker: str, conn) -> Optional[int]:
+        """Look up company_id for a ticker."""
+        row = conn.execute(
+            text("SELECT company_id FROM dim_company WHERE ticker = :t"),
+            {"t": ticker},
+        ).fetchone()
+        return row[0] if row else None
+
+    def _resolve_date_id(self, d: date, conn) -> Optional[int]:
+        """Look up date_id for a date, or return None."""
+        row = conn.execute(
+            text("SELECT date_id FROM dim_date WHERE date = :d"),
+            {"d": d.isoformat()},
+        ).fetchone()
+        return row[0] if row else None
+
+    def store_sentiment(
+        self,
+        ticker: str,
+        score_date: date,
+        sentiment_score: float,
+        n_headlines: int = 0,
+        raw_scores: Optional[List[float]] = None,
+    ) -> bool:
+        """
+        Upsert a sentiment score into fact_sentiment.
+
+        Returns True on success.
+        """
+        raw_json = json.dumps(raw_scores) if raw_scores else None
+
+        try:
+            with self.engine.connect() as conn:
+                company_id = self._resolve_company_id(ticker, conn)
+                if company_id is None:
+                    logger.warning(f"Ticker {ticker} not in dim_company, skipping")
+                    return False
+
+                date_id = self._resolve_date_id(score_date, conn)
+                if date_id is None:
+                    logger.warning(f"Date {score_date} not in dim_date, skipping")
+                    return False
+
+                conn.execute(
+                    text("""
+                        INSERT INTO fact_sentiment
+                            (company_id, date_id, sentiment_score, n_headlines, raw_scores)
+                        VALUES (:cid, :did, :score, :n, :raw)
+                        ON CONFLICT(company_id, date_id)
+                        DO UPDATE SET
+                            sentiment_score = :score,
+                            n_headlines = :n,
+                            raw_scores = :raw,
+                            created_at = CURRENT_TIMESTAMP
+                    """),
+                    {
+                        "cid": company_id,
+                        "did": date_id,
+                        "score": sentiment_score,
+                        "n": n_headlines,
+                        "raw": raw_json,
+                    },
+                )
+                conn.commit()
+            return True
+
+        except Exception as e:
+            logger.error(f"store_sentiment failed for {ticker}/{score_date}: {e}")
+            return False
+
+    def load_sentiment(
+        self,
+        tickers: List[str],
+        start_date: date,
+        end_date: date,
+    ) -> Dict[str, pd.Series]:
+        """
+        Load pre-computed sentiment scores from fact_sentiment.
+
+        Args:
+            tickers: List of ticker symbols.
+            start_date: Start date.
+            end_date: End date.
+
+        Returns:
+            Dict of ticker -> date-indexed Series of sentiment_score.
+        """
+        if not tickers:
+            return {}
+
+        # Build a single query for all requested tickers
+        placeholders = ", ".join(f":t{i}" for i in range(len(tickers)))
+        params = {f"t{i}": t for i, t in enumerate(tickers)}
+        params["start"] = start_date
+        params["end"] = end_date
+
+        query = f"""
+            SELECT
+                c.ticker,
+                d.date,
+                fs.sentiment_score
+            FROM fact_sentiment fs
+            JOIN dim_company c ON fs.company_id = c.company_id
+            JOIN dim_date d ON fs.date_id = d.date_id
+            WHERE c.ticker IN ({placeholders})
+              AND d.date >= :start
+              AND d.date <= :end
+            ORDER BY c.ticker, d.date
+        """
+
+        try:
+            with self.engine.connect() as conn:
+                df = pd.read_sql(text(query), conn, params=params)
+        except Exception as e:
+            logger.error(f"load_sentiment failed: {e}")
+            return {}
+
+        if df.empty:
+            logger.info("No sentiment data found in fact_sentiment")
+            return {}
+
+        df["date"] = pd.to_datetime(df["date"])
+        result = {}
+        for ticker, group in df.groupby("ticker"):
+            series = group.set_index("date")["sentiment_score"]
+            series = series.sort_index()
+            result[ticker] = series
+
+        logger.info(
+            f"Loaded sentiment for {len(result)}/{len(tickers)} tickers "
+            f"({sum(len(s) for s in result.values())} total observations)"
+        )
+        return result
+
+    def has_sentiment(self, ticker: str, score_date: date) -> bool:
+        """Check if a sentiment score already exists (for idempotent cron)."""
+        query = """
+            SELECT 1
+            FROM fact_sentiment fs
+            JOIN dim_company c ON fs.company_id = c.company_id
+            JOIN dim_date d ON fs.date_id = d.date_id
+            WHERE c.ticker = :ticker AND d.date = :d
+            LIMIT 1
+        """
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(query), {"ticker": ticker, "d": score_date.isoformat()}
+                ).fetchone()
+            return row is not None
+        except Exception:
+            return False
 
     def verify_data_availability(self, ticker: str) -> Tuple[bool, str]:
         """

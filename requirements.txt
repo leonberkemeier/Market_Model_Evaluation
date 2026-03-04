@@ -21,6 +21,11 @@ arch>=6.0.0  # GARCH volatility models
 chromadb>=0.3.0
 requests>=2.31.0
 
+# NLP / Sentiment
+transformers>=4.30.0
+torch>=2.0.0
+finnhub-python>=2.4.0
+
 # Data Sources
 yfinance>=0.2.0
 beautifulsoup4>=4.12.0

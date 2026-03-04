@@ -214,6 +214,15 @@ def main():
         else pd.Series(dtype=float)
     )
 
+    # Load pre-computed sentiment scores from fact_sentiment
+    logger.info("Loading sentiment scores from DB")
+    sentiment_scores = loader.load_sentiment(
+        tickers, TRAINING_START_DATE, BACKTEST_END_DATE
+    )
+    if not sentiment_scores:
+        logger.info("No sentiment data available — sentiment feature will be excluded")
+        sentiment_scores = None
+
     # --- Robustness analysis mode ---
     if args.robustness:
         logger.info("Running robustness analysis: VIX vs FEDFUNDS")
@@ -280,6 +289,7 @@ def main():
         market_prices=market_prices,
         macro_feature=macro_feature,
         bond_spread=bond_spread,
+        sentiment_scores=sentiment_scores,
     )
 
     # --- Step 5: Report results ---

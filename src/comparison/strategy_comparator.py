@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 from loguru import logger
 
+from typing import Dict
 from ..portfolio.strategy_runner import StrategyRunner, BayesianStrategyRunner, AllocationResult
 
 
@@ -69,6 +70,7 @@ class StrategyComparator:
         market_prices: Optional[pd.DataFrame] = None,
         macro_feature: Optional[pd.Series] = None,
         bond_spread: Optional[pd.Series] = None,
+        sentiment_scores: Optional[Dict[str, pd.Series]] = None,
     ) -> ComparisonResult:
         """
         Run all strategies across rebalance dates and compare.
@@ -108,6 +110,7 @@ class StrategyComparator:
                         macro_feature=macro_feature if macro_feature is not None else pd.Series(dtype=float),
                         bond_spread=bond_spread if bond_spread is not None else pd.Series(dtype=float),
                         market_prices=market_prices,
+                        sentiment_scores=sentiment_scores,
                     )
                 else:
                     allocation = runner.run(

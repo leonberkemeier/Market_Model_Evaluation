@@ -185,6 +185,13 @@ COPULA_DOF_MIN = 2            # Min degrees of freedom for Student-t copula
 COPULA_DOF_MAX = 30           # Max degrees of freedom for Student-t copula
 COPULA_DOF_STEP = 1           # Grid step for ν search
 
+# NLP Sentiment (Tier 3 feature)
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
+FINBERT_MODEL = "ProsusAI/finbert"
+SENTIMENT_EWMA_SPAN = 3       # EWMA span (days) for smoothing headline scores
+SENTIMENT_HEADLINE_WINDOW = 7 # Look-back days for headline collection
+SENTIMENT_MIN_HEADLINES = 3   # Minimum headlines to produce a valid score
+
 # Monte Carlo
 BAYESIAN_MC_N_SIMS = 10000    # Number of simulations for Bayesian MC
 

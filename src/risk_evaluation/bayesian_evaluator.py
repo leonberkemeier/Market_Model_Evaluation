@@ -65,7 +65,7 @@ class BayesianEvaluator:
     Bayesian Ridge evaluator producing posterior predictive distributions.
 
     For each stock, trains a BayesianRidge model on:
-        X = [frac_diff_lag_1, ..., frac_diff_lag_N, state_0, state_1, state_2, macro, spread]
+        X = [frac_diff_lag_1, ..., frac_diff_lag_N, state_0, state_1, state_2, macro, spread, sentiment]
         y = next-period frac-diff return
 
     The model's `predict(X, return_std=True)` gives (μ, σ) for each
@@ -104,13 +104,14 @@ class BayesianEvaluator:
         hmm_index: pd.DatetimeIndex,
         macro_feature: pd.Series,
         bond_spread: Optional[pd.Series] = None,
+        sentiment_score: Optional[pd.Series] = None,
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Build the feature matrix and target for a single stock.
 
-        Bond spread is optional — if empty or None it is excluded from
-        the feature set rather than causing the entire matrix to be
-        dropped via an inner join on sparse data.
+        Bond spread and sentiment are optional — if empty or None they
+        are excluded from the feature set rather than causing the entire
+        matrix to be dropped via an inner join on sparse data.
 
         Returns:
             (X, y): Feature DataFrame and target Series, aligned on common dates.
@@ -154,6 +155,20 @@ class BayesianEvaluator:
         else:
             self.logger.debug("Bond spread excluded — insufficient data")
 
+        # Sentiment — same optional pattern
+        _has_sentiment = (
+            sentiment_score is not None
+            and isinstance(sentiment_score, pd.Series)
+            and not sentiment_score.empty
+            and sentiment_score.notna().sum() >= 10
+        )
+        if _has_sentiment:
+            sent_df = sentiment_score.rename("sentiment").to_frame()
+            combined = combined.join(sent_df, how="left")
+            combined["sentiment"] = combined["sentiment"].ffill()
+        else:
+            self.logger.debug("Sentiment excluded — insufficient data")
+
         combined = combined.join(target, how="inner")
 
         # Drop rows with any NaN (from lagging and shifting)
@@ -175,6 +190,7 @@ class BayesianEvaluator:
         hmm_index: pd.DatetimeIndex,
         macro_feature: pd.Series,
         bond_spread: Optional[pd.Series] = None,
+        sentiment_score: Optional[pd.Series] = None,
         train_end: date = date.today(),
     ) -> Optional[BayesianPosterior]:
         """
@@ -190,13 +206,15 @@ class BayesianEvaluator:
             hmm_index: DatetimeIndex corresponding to hmm_states.
             macro_feature: VIX or FEDFUNDS series (date-indexed).
             bond_spread: Bond yield spread series (optional, date-indexed).
+            sentiment_score: Sentiment EWMA series (optional, date-indexed).
             train_end: Last date to include in training (expanding window).
 
         Returns:
             BayesianPosterior or None if insufficient data.
         """
         X, y = self._build_feature_matrix(
-            frac_diff_returns, hmm_states, hmm_index, macro_feature, bond_spread
+            frac_diff_returns, hmm_states, hmm_index, macro_feature,
+            bond_spread, sentiment_score,
         )
 
         if X.empty or len(X) < 30:
@@ -264,6 +282,7 @@ class BayesianEvaluator:
         hmm_states_dict: Dict[str, Tuple[np.ndarray, pd.DatetimeIndex]],
         macro_feature: pd.Series,
         bond_spread: Optional[pd.Series] = None,
+        sentiment_scores: Optional[Dict[str, pd.Series]] = None,
         train_end: date = date.today(),
     ) -> Dict[str, BayesianPosterior]:
         """
@@ -274,6 +293,7 @@ class BayesianEvaluator:
             hmm_states_dict: Dict of ticker -> (state_ids, index).
             macro_feature: VIX or FEDFUNDS series.
             bond_spread: Bond yield spread series (optional).
+            sentiment_scores: Dict of ticker -> sentiment series (optional).
             train_end: Expanding window cutoff date.
 
         Returns:
@@ -289,6 +309,9 @@ class BayesianEvaluator:
                     continue
 
                 states, idx = hmm_states_dict[ticker]
+                ticker_sentiment = (
+                    sentiment_scores.get(ticker) if sentiment_scores else None
+                )
 
                 posterior = self.evaluate(
                     ticker=ticker,
@@ -297,6 +320,7 @@ class BayesianEvaluator:
                     hmm_index=idx,
                     macro_feature=macro_feature,
                     bond_spread=bond_spread,
+                    sentiment_score=ticker_sentiment,
                     train_end=train_end,
                 )
 
