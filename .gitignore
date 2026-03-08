@@ -47,3 +47,4 @@ results/visualizations/*.png
 .cache/
 logs/
 feature_cache/
+.env
