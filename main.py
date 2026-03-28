@@ -223,6 +223,15 @@ def main():
         logger.info("No sentiment data available — sentiment feature will be excluded")
         sentiment_scores = None
 
+    # Load LLM-derived filing features from fact_filing_analysis
+    logger.info("Loading filing NLP features from DB")
+    filing_features = loader.load_filing_features(
+        tickers, TRAINING_START_DATE, BACKTEST_END_DATE
+    )
+    if not filing_features:
+        logger.info("No filing NLP data available — filing features will be excluded")
+        filing_features = None
+
     # --- Robustness analysis mode ---
     if args.robustness:
         logger.info("Running robustness analysis: VIX vs FEDFUNDS")
@@ -290,6 +299,7 @@ def main():
         macro_feature=macro_feature,
         bond_spread=bond_spread,
         sentiment_scores=sentiment_scores,
+        filing_features=filing_features,
     )
 
     # --- Step 5: Report results ---

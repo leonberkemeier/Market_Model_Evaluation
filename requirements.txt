@@ -25,6 +25,7 @@ requests>=2.31.0
 transformers>=4.30.0
 torch>=2.0.0
 finnhub-python>=2.4.0
+httpx>=0.27.0  # Ollama HTTP client for filing NLP analysis
 
 # Data Sources
 yfinance>=0.2.0

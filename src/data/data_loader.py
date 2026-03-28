@@ -559,6 +559,131 @@ class DataLoader:
         )
         return result
 
+    # ------------------------------------------------------------------
+    # Filing NLP features (fact_filing_analysis)
+    # ------------------------------------------------------------------
+
+    def load_filing_features(
+        self,
+        tickers: List[str],
+        start_date: date,
+        end_date: date,
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Load LLM-derived filing features from fact_filing_analysis.
+
+        Returns a dict of ticker -> DataFrame with columns:
+            filing_date, mgmt_sentiment, risk_count, guidance_tone,
+            revenue_extracted, operating_income_extracted
+        Sorted by filing_date ascending.
+        """
+        if not tickers:
+            return {}
+
+        placeholders = ", ".join(f":t{i}" for i in range(len(tickers)))
+        params = {f"t{i}": t for i, t in enumerate(tickers)}
+        params["start"] = start_date
+        params["end"] = end_date
+
+        query = f"""
+            SELECT
+                c.ticker,
+                d.date as filing_date,
+                fa.mgmt_sentiment,
+                fa.risk_count,
+                fa.guidance_tone,
+                fa.revenue_extracted,
+                fa.operating_income_extracted
+            FROM fact_filing_analysis fa
+            JOIN fact_sec_filing f ON fa.filing_id = f.filing_id
+            JOIN dim_company c ON fa.company_id = c.company_id
+            JOIN dim_date d ON fa.date_id = d.date_id
+            WHERE c.ticker IN ({placeholders})
+              AND d.date >= :start
+              AND d.date <= :end
+              AND fa.llm_analyzed_at IS NOT NULL
+            ORDER BY c.ticker, d.date
+        """
+
+        try:
+            with self.engine.connect() as conn:
+                df = pd.read_sql(text(query), conn, params=params)
+        except Exception as e:
+            logger.error(f"load_filing_features failed: {e}")
+            return {}
+
+        if df.empty:
+            logger.info("No filing NLP features found")
+            return {}
+
+        df["filing_date"] = pd.to_datetime(df["filing_date"])
+        result = {}
+        for ticker, group in df.groupby("ticker"):
+            result[ticker] = group.set_index("filing_date").drop(columns=["ticker"])
+
+        logger.info(
+            f"Loaded filing features for {len(result)}/{len(tickers)} tickers "
+            f"({sum(len(v) for v in result.values())} total filings)"
+        )
+        return result
+
+    def get_latest_nlp_features(
+        self,
+        ticker: str,
+        as_of_date: date,
+    ) -> Optional[Dict]:
+        """
+        Return the most recent filing NLP features available before as_of_date.
+
+        Used by BayesianEvaluator during backtest to get point-in-time
+        fundamental features without look-ahead bias.
+
+        Returns:
+            Dict with keys: mgmt_sentiment, risk_count, guidance_tone,
+            revenue_extracted, operating_income_extracted, filing_date.
+            Or None if no analyzed filing exists before as_of_date.
+        """
+        query = """
+            SELECT
+                d.date as filing_date,
+                fa.mgmt_sentiment,
+                fa.risk_count,
+                fa.guidance_tone,
+                fa.revenue_extracted,
+                fa.operating_income_extracted
+            FROM fact_filing_analysis fa
+            JOIN fact_sec_filing f ON fa.filing_id = f.filing_id
+            JOIN dim_company c ON fa.company_id = c.company_id
+            JOIN dim_date d ON fa.date_id = d.date_id
+            WHERE c.ticker = :ticker
+              AND d.date < :as_of
+              AND fa.llm_analyzed_at IS NOT NULL
+            ORDER BY d.date DESC
+            LIMIT 1
+        """
+
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(query),
+                    {"ticker": ticker, "as_of": as_of_date.isoformat()},
+                ).fetchone()
+        except Exception as e:
+            logger.error(f"get_latest_nlp_features failed for {ticker}: {e}")
+            return None
+
+        if not row:
+            return None
+
+        return {
+            "filing_date": row[0],
+            "mgmt_sentiment": row[1],
+            "risk_count": row[2],
+            "guidance_tone": row[3],
+            "revenue_extracted": row[4],
+            "operating_income_extracted": row[5],
+        }
+
     def has_sentiment(self, ticker: str, score_date: date) -> bool:
         """Check if a sentiment score already exists (for idempotent cron)."""
         query = """

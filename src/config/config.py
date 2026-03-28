@@ -192,6 +192,12 @@ SENTIMENT_EWMA_SPAN = 3       # EWMA span (days) for smoothing headline scores
 SENTIMENT_HEADLINE_WINDOW = 7 # Look-back days for headline collection
 SENTIMENT_MIN_HEADLINES = 3   # Minimum headlines to produce a valid score
 
+# Filing NLP Analysis (Tier 3 feature — LLM-based)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://llmserver:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:latest")
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
+FILING_NLP_FEATURES = ["mgmt_sentiment", "risk_count", "guidance_tone"]
+
 # Monte Carlo
 BAYESIAN_MC_N_SIMS = 10000    # Number of simulations for Bayesian MC
 

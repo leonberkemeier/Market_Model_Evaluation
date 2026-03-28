@@ -105,13 +105,14 @@ class BayesianEvaluator:
         macro_feature: pd.Series,
         bond_spread: Optional[pd.Series] = None,
         sentiment_score: Optional[pd.Series] = None,
+        filing_features: Optional[pd.DataFrame] = None,
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Build the feature matrix and target for a single stock.
 
-        Bond spread and sentiment are optional — if empty or None they
-        are excluded from the feature set rather than causing the entire
-        matrix to be dropped via an inner join on sparse data.
+        Bond spread, sentiment, and filing features are optional — if empty
+        or None they are excluded from the feature set rather than causing
+        the entire matrix to be dropped via an inner join on sparse data.
 
         Returns:
             (X, y): Feature DataFrame and target Series, aligned on common dates.
@@ -169,6 +170,23 @@ class BayesianEvaluator:
         else:
             self.logger.debug("Sentiment excluded — insufficient data")
 
+        # Filing NLP features — quarterly, forward-filled
+        _has_filing = (
+            filing_features is not None
+            and isinstance(filing_features, pd.DataFrame)
+            and not filing_features.empty
+            and len(filing_features) >= 2
+        )
+        if _has_filing:
+            for col in ["mgmt_sentiment", "risk_count", "guidance_tone"]:
+                if col in filing_features.columns:
+                    col_series = filing_features[col]
+                    col_df = col_series.rename(f"filing_{col}").to_frame()
+                    combined = combined.join(col_df, how="left")
+                    combined[f"filing_{col}"] = combined[f"filing_{col}"].ffill()
+        else:
+            self.logger.debug("Filing NLP features excluded — insufficient data")
+
         combined = combined.join(target, how="inner")
 
         # Drop rows with any NaN (from lagging and shifting)
@@ -191,6 +209,7 @@ class BayesianEvaluator:
         macro_feature: pd.Series,
         bond_spread: Optional[pd.Series] = None,
         sentiment_score: Optional[pd.Series] = None,
+        filing_features: Optional[pd.DataFrame] = None,
         train_end: date = date.today(),
     ) -> Optional[BayesianPosterior]:
         """
@@ -207,6 +226,7 @@ class BayesianEvaluator:
             macro_feature: VIX or FEDFUNDS series (date-indexed).
             bond_spread: Bond yield spread series (optional, date-indexed).
             sentiment_score: Sentiment EWMA series (optional, date-indexed).
+            filing_features: Filing NLP DataFrame (optional, date-indexed).
             train_end: Last date to include in training (expanding window).
 
         Returns:
@@ -214,7 +234,7 @@ class BayesianEvaluator:
         """
         X, y = self._build_feature_matrix(
             frac_diff_returns, hmm_states, hmm_index, macro_feature,
-            bond_spread, sentiment_score,
+            bond_spread, sentiment_score, filing_features,
         )
 
         if X.empty or len(X) < 30:
@@ -283,6 +303,7 @@ class BayesianEvaluator:
         macro_feature: pd.Series,
         bond_spread: Optional[pd.Series] = None,
         sentiment_scores: Optional[Dict[str, pd.Series]] = None,
+        filing_features: Optional[Dict[str, pd.DataFrame]] = None,
         train_end: date = date.today(),
     ) -> Dict[str, BayesianPosterior]:
         """
@@ -294,6 +315,7 @@ class BayesianEvaluator:
             macro_feature: VIX or FEDFUNDS series.
             bond_spread: Bond yield spread series (optional).
             sentiment_scores: Dict of ticker -> sentiment series (optional).
+            filing_features: Dict of ticker -> filing NLP DataFrame (optional).
             train_end: Expanding window cutoff date.
 
         Returns:
@@ -312,6 +334,9 @@ class BayesianEvaluator:
                 ticker_sentiment = (
                     sentiment_scores.get(ticker) if sentiment_scores else None
                 )
+                ticker_filing = (
+                    filing_features.get(ticker) if filing_features else None
+                )
 
                 posterior = self.evaluate(
                     ticker=ticker,
@@ -321,6 +346,7 @@ class BayesianEvaluator:
                     macro_feature=macro_feature,
                     bond_spread=bond_spread,
                     sentiment_score=ticker_sentiment,
+                    filing_features=ticker_filing,
                     train_end=train_end,
                 )
 

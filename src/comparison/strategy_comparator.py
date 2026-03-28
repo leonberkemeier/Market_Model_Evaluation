@@ -71,6 +71,7 @@ class StrategyComparator:
         macro_feature: Optional[pd.Series] = None,
         bond_spread: Optional[pd.Series] = None,
         sentiment_scores: Optional[Dict[str, pd.Series]] = None,
+        filing_features: Optional[Dict[str, pd.DataFrame]] = None,
     ) -> ComparisonResult:
         """
         Run all strategies across rebalance dates and compare.
@@ -81,6 +82,8 @@ class StrategyComparator:
             market_prices: Benchmark prices for beta calculations
             macro_feature: VIX or FEDFUNDS series (for Bayesian strategies)
             bond_spread: Bond yield spread series (for Bayesian strategies)
+            sentiment_scores: Dict of ticker -> sentiment series (optional)
+            filing_features: Dict of ticker -> filing NLP DataFrame (optional)
 
         Returns:
             ComparisonResult with metrics and equity curves
@@ -111,6 +114,7 @@ class StrategyComparator:
                         bond_spread=bond_spread if bond_spread is not None else pd.Series(dtype=float),
                         market_prices=market_prices,
                         sentiment_scores=sentiment_scores,
+                        filing_features=filing_features,
                     )
                 else:
                     allocation = runner.run(

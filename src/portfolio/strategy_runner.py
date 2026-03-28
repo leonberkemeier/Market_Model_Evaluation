@@ -284,6 +284,7 @@ class BayesianStrategyRunner:
         bond_spread: pd.Series,
         market_prices: Optional[pd.DataFrame] = None,
         sentiment_scores: Optional[Dict[str, pd.Series]] = None,
+        filing_features: Optional[Dict[str, "pd.DataFrame"]] = None,
     ) -> AllocationResult:
         """
         Run the full Bayesian pipeline.
@@ -295,6 +296,7 @@ class BayesianStrategyRunner:
             bond_spread: 10Y-2Y bond yield spread series.
             market_prices: SPY benchmark (for regime detection).
             sentiment_scores: Dict of ticker -> sentiment series (optional).
+            filing_features: Dict of ticker -> filing NLP DataFrame (optional).
 
         Returns:
             AllocationResult with Bayesian Kelly weights.
@@ -377,6 +379,7 @@ class BayesianStrategyRunner:
             macro_feature=macro_feature,
             bond_spread=bond_spread,
             sentiment_scores=sentiment_scores,
+            filing_features=filing_features,
             train_end=evaluation_date,
         )
 
