@@ -16,7 +16,7 @@ Usage:
 
 import argparse
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Add project root to path
@@ -84,7 +84,7 @@ def update_analysis(engine, filing_id: int, analysis_id: int, result_dict: dict)
                         updated_at = :llm_analyzed_at
                     WHERE filing_id = :filing_id
                 """),
-                {**result_dict, "filing_id": filing_id, "llm_analyzed_at": datetime.utcnow()},
+                {**result_dict, "filing_id": filing_id, "llm_analyzed_at": datetime.now(timezone.utc)},
             )
         else:
             # Need to create a row first — get company_id and date_id
@@ -115,7 +115,7 @@ def update_analysis(engine, filing_id: int, analysis_id: int, result_dict: dict)
                         "filing_id": filing_id,
                         "company_id": row[0],
                         "date_id": row[1],
-                        "llm_analyzed_at": datetime.utcnow(),
+                        "llm_analyzed_at": datetime.now(timezone.utc),
                     },
                 )
         conn.commit()

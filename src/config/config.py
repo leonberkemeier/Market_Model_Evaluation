@@ -194,7 +194,7 @@ SENTIMENT_MIN_HEADLINES = 3   # Minimum headlines to produce a valid score
 
 # Filing NLP Analysis (Tier 3 feature — LLM-based)
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://llmserver:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:latest")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:12b-it-qat")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
 FILING_NLP_FEATURES = ["mgmt_sentiment", "risk_count", "guidance_tone"]
 

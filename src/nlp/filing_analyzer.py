@@ -36,35 +36,29 @@ _NEXT_ITEM_RE = re.compile(
     r"\b[Ii]tem\s+\d+[A-Za-z]?\s*\.\s+[A-Z]"
 )
 
-MAX_SECTION_CHARS = 48_000  # ~12k tokens for llama3.1:8b context
+MAX_SECTION_CHARS = 16_000  # ~4k tokens — keeps Qwen3 responses fast and parseable
 
 
 # ── Prompt templates ──────────────────────────────────────────────────────
 
 MDA_SENTIMENT_PROMPT = """\
-You are a financial analyst. Read the following MD&A (Management's Discussion and Analysis) section from a SEC filing and produce a JSON object with these fields:
-
-1. "mgmt_sentiment": a float from -1.0 (very negative tone) to 1.0 (very positive tone) reflecting management's overall tone about the company's performance and outlook.
-2. "revenue_millions": the most recent total revenue/net sales figure mentioned, in millions of USD. Use null if not found.
-3. "operating_income_millions": the most recent operating income/EBIT figure mentioned, in millions of USD. Use null if not found.
-4. "guidance_tone": a float from -1.0 to 1.0 reflecting the tone of any forward-looking statements or guidance. Use 0.0 if no forward-looking statements found.
-
-Respond ONLY with valid JSON, no explanation.
+Analyze this MD&A section and respond with ONLY a JSON object. No explanation, no summary.
 
 MD&A TEXT:
 {section_text}
+
+Based on the MD&A above, output ONLY this JSON (no other text):
+{{"mgmt_sentiment": <float -1.0 to 1.0>, "revenue_millions": <number or null>, "operating_income_millions": <number or null>, "guidance_tone": <float -1.0 to 1.0>}}
 """
 
 RISK_ANALYSIS_PROMPT = """\
-You are a financial analyst. Read the following Risk Factors section (Item 1A) from a SEC filing and produce a JSON object with these fields:
-
-1. "risk_count": the number of distinct, material risk categories identified.
-2. "risk_summary": a JSON array of short strings (max 10 words each) naming each distinct risk category. Maximum 20 categories.
-
-Respond ONLY with valid JSON, no explanation.
+Analyze this Risk Factors section and respond with ONLY a JSON object. No explanation, no summary.
 
 RISK FACTORS TEXT:
 {section_text}
+
+Based on the risks above, output ONLY this JSON (no other text):
+{{"risk_count": <integer>, "risk_summary": ["risk1", "risk2", ...]}}
 """
 
 
@@ -133,15 +127,16 @@ class FilingNLPAnalyzer:
                     )
                     return False
 
-                # Quick generation test
+                # Quick generation test (generous timeout for cold model load)
                 resp = client.post(
                     f"{self.base_url}/api/generate",
                     json={
                         "model": self.model,
                         "prompt": "Respond with exactly: OK",
                         "stream": False,
+                        "options": {"num_predict": 8},
                     },
-                    timeout=30,
+                    timeout=180,
                 )
                 resp.raise_for_status()
                 self.logger.info("Ollama connectivity test passed")
@@ -243,25 +238,36 @@ class FilingNLPAnalyzer:
         if not raw:
             return None
 
+        # Strip Qwen3 <think>...</think> reasoning blocks
+        cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+
         # Try direct parse
         try:
-            return json.loads(raw.strip())
+            return json.loads(cleaned)
         except json.JSONDecodeError:
             pass
 
         # Try extracting JSON block from markdown fences
-        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL)
         if json_match:
             try:
                 return json.loads(json_match.group(1))
             except json.JSONDecodeError:
                 pass
 
-        # Try finding first {...} block
-        brace_match = re.search(r"\{[^{}]*\}", raw, re.DOTALL)
+        # Try finding first {...} block (allow nested for risk_summary arrays)
+        brace_match = re.search(r"\{[^}]*\}", cleaned, re.DOTALL)
         if brace_match:
             try:
                 return json.loads(brace_match.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        # Last resort: find outermost { ... } allowing nested braces
+        deep_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if deep_match:
+            try:
+                return json.loads(deep_match.group(0))
             except json.JSONDecodeError:
                 pass
 
