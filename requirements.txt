@@ -46,6 +46,9 @@ pyyaml>=6.0
 pytest>=7.3.0
 pytest-cov>=4.1.0
 
+# MCP / Advisory
+fastmcp>=2.0.0
+
 # Development
 jupyter>=1.0.0
 ipython>=8.0.0

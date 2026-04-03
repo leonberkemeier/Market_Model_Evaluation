@@ -273,6 +273,17 @@ if "~" in RAG_CHROMA_PATH:
     RAG_CHROMA_PATH = RAG_CHROMA_PATH.replace("~", os.path.expanduser("~"))
 
 # ============================================================================
+# ADVISORY / MCP CONFIGURATION
+# ============================================================================
+# MCP server transport ("stdio" for local, "http" for remote)
+MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
+MCP_HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "8100"))
+
+# Gemma 3 Decision Agent
+ADVISOR_MAX_TOOL_ROUNDS = int(os.getenv("ADVISOR_MAX_TOOL_ROUNDS", "15"))
+ADVISOR_TEMPERATURE = float(os.getenv("ADVISOR_TEMPERATURE", "0.2"))
+
+# ============================================================================
 # EXPORT FOR EASY ACCESS
 # ============================================================================
 __all__ = [
@@ -293,4 +304,8 @@ __all__ = [
     "REBALANCE_FREQUENCY",
     "KELLY_FRACTION",
     "LOG_LEVEL",
+    "MCP_TRANSPORT",
+    "MCP_HTTP_PORT",
+    "ADVISOR_MAX_TOOL_ROUNDS",
+    "ADVISOR_TEMPERATURE",
 ]
