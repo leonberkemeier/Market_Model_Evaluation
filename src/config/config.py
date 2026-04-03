@@ -198,6 +198,12 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:12b-it-qat")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
 FILING_NLP_FEATURES = ["mgmt_sentiment", "risk_count", "guidance_tone"]
 
+# Filing Vector Embeddings (ChromaDB)
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text:latest")
+EMBEDDING_COLLECTION = "sec_filings_normalized"
+EMBEDDING_CHUNK_SIZE = 1500      # chars per chunk
+EMBEDDING_CHUNK_OVERLAP = 200    # overlap between chunks
+
 # Monte Carlo
 BAYESIAN_MC_N_SIMS = 10000    # Number of simulations for Bayesian MC
 
