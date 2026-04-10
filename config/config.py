@@ -75,6 +75,20 @@ TECHNICAL_FEATURES = {
 # MODEL TRAINING PARAMETERS
 # ============================================================================
 
+# ============================================================================
+# ⚠️ DEPRECATED CONFIGURATIONS (Old 4-Scorer Architecture)
+# ============================================================================
+# These configs are for the OLD system using Linear, CNN, XGBoost models.
+# DO NOT USE IN NEW CODE.
+# 
+# For new 7-phase pipeline, use the NEW configs below:
+#  - MARKOV_CONFIG
+#  - MONTE_CARLO_CONFIG
+#  - RISK_PROFILES_CONFIG
+#  - LLM_ASSET_SELECTOR_CONFIG
+#  - ANALYSIS_PIPELINE_CONFIG
+# ============================================================================
+
 # Linear Regression Scorer
 LINEAR_CONFIG = {
     "lookback_period": 252,  # 1 year
@@ -159,6 +173,58 @@ FEATURE_CACHE_CONFIG = {
     "cache_db": CACHE_DIR / "feature_cache.db",
     "ttl_days": 7,  # Recompute features after 7 days
     "compress": True,
+}
+
+# ============================================================================
+# NEW PIPELINE CONFIGS (April 10, 2026 Redesign)
+# ⚠️ DEPRECATED CONFIGS ABOVE - Use these for NEW 7-phase pipeline
+# ============================================================================
+
+# Markov Chain Regime Detector
+MARKOV_CONFIG = {
+    "n_states": 5,
+    "n_iter": 100,
+    "random_state": 42,
+    "lookback_days": 252,
+    "model_path": MODELS_DIR / "markov_regime_model.pkl",
+}
+
+# Enhanced Monte Carlo Simulator
+MONTE_CARLO_CONFIG = {
+    "n_simulations": 10000,
+    "horizon_days": 252,
+    "use_regime_filtering": True,
+    "random_state": 42,
+}
+
+# Risk Profile Registry (5 predefined investor profiles)
+RISK_PROFILES_CONFIG = {
+    "profiles": ["VERY_CONSERVATIVE", "CONSERVATIVE", "MODERATE", "AGGRESSIVE", "VERY_AGGRESSIVE"],
+    "validation_enabled": True,
+    "min_positions": 10,
+    "max_position_size": 0.05,
+    "max_sector_concentration": 0.20,
+    "max_top_5_concentration": 0.30,
+}
+
+# LLM Asset Selector
+LLM_ASSET_SELECTOR_CONFIG = {
+    "model": "llama2",
+    "base_url": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
+    "temperature": 0.3,
+    "top_p": 0.9,
+    "max_tokens": 500,
+    "timeout": 30,
+}
+
+# Analysis Pipeline (7-phase orchestrator)
+ANALYSIS_PIPELINE_CONFIG = {
+    "n_assets_to_consider": 250,
+    "n_assets_to_score": 50,
+    "n_assets_to_portfolio": 20,
+    "rerun_markov_interval_days": 30,
+    "export_dir": RESULTS_DIR,
+    "enable_caching": True,
 }
 
 # ============================================================================

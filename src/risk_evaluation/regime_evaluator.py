@@ -1,5 +1,21 @@
 """
-Regime-Conditional Risk Evaluator
+⚠️ DEPRECATED: Regime-Conditional Risk Evaluator (Old Architecture)
+
+This module uses HMM regime detection (3 states) from the OLD system.
+
+STATUS: DEPRECATED as of April 10, 2026
+
+FOR NEW CODE: Use src.risk.enhanced_monte_carlo.MonteCarloSimulator instead
+The new simulator features:
+- Markov Chain Regime Detection (5 states)
+- Automatic regime filtering of historical returns
+- Comprehensive risk metrics (VaR, ES, skewness, kurtosis)
+- Regime suitability scoring for each asset
+- Type-safe MonteCarloMetrics dataclass
+
+This module is kept for backward compatibility only.
+
+---
 
 Uses HMM regime detection to compute risk stats conditional on the
 current market regime. In a bear regime, uses bear-period historical
@@ -19,7 +35,15 @@ from scipy import stats
 from .base_evaluator import BaseRiskEvaluator
 from .historical_evaluator import HistoricalEvaluator
 from .risk_profile import RiskProfile
-from ..regime.hmm_detector import HMMRegimeDetector
+from ..regime.hmm_detector import HMMRegimeDetector  # ⚠️ LEGACY
+
+import logging
+logger = logging.getLogger(__name__)
+
+logger.warning(
+    "⚠️ RegimeConditionalEvaluator is DEPRECATED. "
+    "Use src.risk.enhanced_monte_carlo.MonteCarloSimulator for new code."
+)
 
 
 class RegimeConditionalEvaluator(BaseRiskEvaluator):

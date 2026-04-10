@@ -16,9 +16,17 @@ from .config import (
     VALIDATION_END,
     BACKTEST_START,
     BACKTEST_END,
+    # ⚠️ DEPRECATED - for old 4-scorer architecture
     LINEAR_CONFIG,
     CNN_CONFIG,
     XGBOOST_CONFIG,
+    # ✅ NEW - for new 7-phase pipeline
+    MARKOV_CONFIG,
+    MONTE_CARLO_CONFIG,
+    RISK_PROFILES_CONFIG,
+    LLM_ASSET_SELECTOR_CONFIG,
+    ANALYSIS_PIPELINE_CONFIG,
+    # Other configs
     LLM_CONFIG,
     PORTFOLIO_CONFIG,
     BACKTEST_CONFIG,
@@ -41,9 +49,17 @@ __all__ = [
     "VALIDATION_END",
     "BACKTEST_START",
     "BACKTEST_END",
+    # ⚠️ DEPRECATED CONFIGS (Old 4-scorer system)
     "LINEAR_CONFIG",
     "CNN_CONFIG",
     "XGBOOST_CONFIG",
+    # ✅ NEW CONFIGS (7-phase Markov→MC→LLM→Portfolio pipeline)
+    "MARKOV_CONFIG",
+    "MONTE_CARLO_CONFIG",
+    "RISK_PROFILES_CONFIG",
+    "LLM_ASSET_SELECTOR_CONFIG",
+    "ANALYSIS_PIPELINE_CONFIG",
+    # Other configs
     "LLM_CONFIG",
     "PORTFOLIO_CONFIG",
     "BACKTEST_CONFIG",

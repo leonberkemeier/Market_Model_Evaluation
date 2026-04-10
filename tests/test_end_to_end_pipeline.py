@@ -1,10 +1,36 @@
 """
-Integration Test for Sentinel End-to-End Pipeline
+⚠️ DEPRECATED: Integration Test for OLD 4-Scorer Pipeline
 
-This test validates that all 5 layers of the Sentinel pipeline work together.
+This test validates the OLD Sentinel pipeline using:
+- HMM Regime Detection (3 states)
+- Expert Models (Linear, CNN, XGBoost)
+- Monte Carlo + Kelly Criterion
 
-Usage:
+STATUS: DEPRECATED as of April 10, 2026
+
+FOR NEW CODE: Use test_end_to_end_pipeline_NEW.py instead
+
+The NEW test validates the 7-phase pipeline:
+1. Load data from financial_data_aggregator DB
+2. Markov Chain: Detect market regime (5 states)
+3. Enhanced Monte Carlo: Simulate returns + compute risk metrics
+4. LLM Asset Selector: Score assets based on regime + metrics
+5. Risk Profile Portfolio: Construct allocation respecting constraints
+6. Validation: Verify portfolio meets all constraints
+7. Export: Save results and create audit trail
+
+See AUDIT_AND_CLEANUP_REPORT.md for details on the transition.
+
+---
+
+This test is kept for backward compatibility but should not be run
+in production. It tests the deprecated 4-scorer architecture.
+
+Usage (deprecated):
     python tests/test_end_to_end_pipeline.py
+
+Usage (NEW):
+    python tests/test_end_to_end_pipeline_NEW.py
 """
 
 import sys
@@ -15,6 +41,7 @@ import logging
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+# ⚠️ LEGACY IMPORTS - These modules are deprecated
 from src.execution.scheduler import SentinelScheduler
 from src.execution.api_client import TradingSimulatorClient
 from src.execution.portfolio_manager import SentinelPortfolioManager
@@ -30,6 +57,11 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+logger.warning(
+    "⚠️ DEPRECATED TEST: test_end_to_end_pipeline.py is testing the OLD 4-scorer pipeline.\n"
+    "For NEW pipeline tests, use: test_end_to_end_pipeline_NEW.py"
+)
 
 
 def test_pipeline_initialization():
@@ -159,11 +191,13 @@ def main():
         
         if success:
             logger.info("✓ All tests passed!")
+            logger.info("\n⚠️ NOTE: This is testing the DEPRECATED 4-scorer pipeline.")
+            logger.info("For NEW pipeline, run: python tests/test_end_to_end_pipeline_NEW.py")
             logger.info("\nThe end-to-end pipeline is working correctly.")
             logger.info("You can now:")
-            logger.info("  1. Train your expert models (Linear, XGBoost, CNN, LLM)")
-            logger.info("  2. Run the pipeline with real models")
-            logger.info("  3. Execute: python scripts/run_sentinel_daily.py --dry-run")
+            logger.info("  1. Train your expert models (Linear, XGBoost, CNN, LLM) [DEPRECATED]")
+            logger.info("  2. Use NEW pipeline: src.analysis.analysis_pipeline.AnalysisPipeline")
+            logger.info("  3. NEW pipeline: Markov → Enhanced MC → LLM → Risk Profiles")
             return 0
         else:
             logger.error("✗ Some tests failed")

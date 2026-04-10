@@ -1,12 +1,24 @@
 """
-Sentinel Scheduler - End-to-End Pipeline Orchestration
+⚠️ DEPRECATED: Sentinel Scheduler (Old 4-Scorer Architecture)
 
-Orchestrates the full 5-layer Sentinel pipeline:
+This scheduler implements the OLD Sentinel pipeline using:
 - Layer I: Feature Engineering
-- Layer II: Regime Detection
-- Layer III: Expert Models
-- Layer IV: Monte Carlo + Kelly
+- Layer II: HMM Regime Detection (3 states)
+- Layer III: Expert Models (Linear, CNN, XGBoost)
+- Layer IV: Monte Carlo + Kelly Criterion
 - Layer V: Execution
+
+STATUS: DEPRECATED as of April 10, 2026
+
+FOR NEW CODE: Use src.analysis.analysis_pipeline.AnalysisPipeline instead
+The new pipeline features:
+- Layer II: Markov Chain Regime Detection (5 states)
+- Enhanced Monte Carlo with regime filtering
+- LLM-driven asset selection
+- Risk profile-based portfolio construction
+- 7-phase orchestration with comprehensive logging
+
+This module is kept for backward compatibility only.
 """
 
 from typing import Dict, List, Optional, Any
@@ -16,13 +28,18 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from ..regime import HMMRegimeDetector
-from ..experts import BaseExpert
-from ..risk import MonteCarloSimulator, KellyCriterion
+from ..regime import HMMRegimeDetector  # ⚠️ LEGACY
+from ..experts import BaseExpert         # ⚠️ LEGACY
+from ..risk import MonteCarloSimulator, KellyCriterion  # ⚠️ LEGACY
 from .api_client import TradingSimulatorClient
 from .portfolio_manager import SentinelPortfolioManager
 
 logger = logging.getLogger(__name__)
+
+logger.warning(
+    "⚠️ SentinelScheduler is DEPRECATED. "
+    "Use src.analysis.analysis_pipeline.AnalysisPipeline for new code."
+)
 
 
 class SentinelScheduler:
