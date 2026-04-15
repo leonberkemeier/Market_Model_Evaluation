@@ -130,8 +130,8 @@ def train_hmm(
         logger.error(f"Failed to load data: {e}")
         sys.exit(1)
     
-    if len(prices) < 100:
-        logger.error(f"Insufficient data: {len(prices)} days (need at least 100)")
+    if len(prices) < 300:
+        logger.error(f"Insufficient data: {len(prices)} days (need at least 300)")
         sys.exit(1)
     
     logger.info(f"\nTraining data summary:")
