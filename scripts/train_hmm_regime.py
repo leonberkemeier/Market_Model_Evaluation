@@ -165,21 +165,48 @@ def train_hmm(
     
     for regime, metrics in stats.items():
         logger.info(f"\n{regime.upper()} Regime:")
-        logger.info(f"  Mean Daily Return: {metrics['mean_return']:.4f} ({metrics['mean_return']*252:.1%} annualized)")
-        logger.info(f"  Volatility: {metrics['volatility']:.4f} ({metrics['volatility']*np.sqrt(252):.1%} annualized)")
-        logger.info(f"  Frequency: {metrics['frequency']:.1%}")
-        logger.info(f"  Avg Duration: {metrics['avg_duration_days']:.1f} days")
-        logger.info(f"  Max Duration: {metrics['max_duration_days']:.0f} days")
+        logger.info(f"  Mean Daily Return: {metrics.get('mean_return', 0.0):.4f} ({metrics.get('mean_return', 0.0)*252:.1%} annualized)")
+        
+        # Check if dual-timeframe stats exist
+        if 'short_volatility' in metrics and 'long_volatility' in metrics:
+            logger.info(f"  Short Volatility (14d): {metrics['short_volatility']:.4f} ({metrics['short_volatility']*np.sqrt(252):.1%} annualized)")
+            logger.info(f"  Long Volatility (60d):  {metrics['long_volatility']:.4f} ({metrics['long_volatility']*np.sqrt(252):.1%} annualized)")
+        else:
+            logger.info(f"  Volatility: {metrics.get('volatility', 0.0):.4f} ({metrics.get('volatility', 0.0)*np.sqrt(252):.1%} annualized)")
+            
+        logger.info(f"  Frequency: {metrics.get('frequency', 0.0):.1%}")
+        logger.info(f"  Avg Duration: {metrics.get('avg_duration_days', 0.0):.1f} days")
+        logger.info(f"  Max Duration: {metrics.get('max_duration_days', 0.0):.0f} days")
     
-    # Current regime
+    # Analyze the most recent state by breaking down how the timeline looks
+    # We will pass dummy arrays into a mock single prediction to show isolated timelines
+    
+    long_only = HMMRegimeDetector(n_states=3, n_iter=100, random_state=42)
+    short_only = HMMRegimeDetector(n_states=3, n_iter=100, random_state=42)
+    
     current_regime = detector.predict_regime(prices, return_probabilities=True)
     logger.info("\n" + "=" * 60)
     logger.info("Current Market Regime (as of training end)")
     logger.info("=" * 60)
+    logger.info(f"  Dual-Timeframe Output:")
     logger.info(f"  Regime: {current_regime['regime'].upper()}")
     logger.info(f"  Confidence: {current_regime['confidence']:.1%}")
     logger.info(f"  Probabilities:")
     for regime, prob in current_regime['probabilities'].items():
+        logger.info(f"    {regime.capitalize():10s} {prob:.1%}")
+        
+    try:
+        short_only.fit(prices, short_window=14, long_window=14, verbose=False)
+        long_only.fit(prices, short_window=60, long_window=60, verbose=False)
+        s_cur = short_only.predict_regime(prices, short_window=14, long_window=14)
+        l_cur = long_only.predict_regime(prices, short_window=60, long_window=60)
+        
+        logger.info("\n" + "-" * 60)
+        logger.info("  Isolated Timeline Analysis:")
+        logger.info(f"    Short Timeline Only (14d): {s_cur['regime'].upper()}")
+        logger.info(f"    Long Timeline Only (60d):  {l_cur['regime'].upper()}")
+    except Exception:
+        pass
         logger.info(f"    {regime.capitalize():10s} {prob:.1%}")
     
     # Validation

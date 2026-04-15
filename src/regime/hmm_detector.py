@@ -65,32 +65,42 @@ class HMMRegimeDetector:
         window: int = 20
     ) -> np.ndarray:
         """
-        Prepare features for HMM from price series (backward-compatible).
+        Prepare features for HMM from price series.
         
         Features:
-        1. Returns (normalized)
-        2. Volatility (rolling std of returns)
+        1. Returns (normalized daily drift)
+        2. Volatility (rolling std of returns to measure variance)
+        3. Trend (price vs moving average to measure direction)
         
         Args:
             prices: Series of closing prices
-            window: Rolling window for volatility calculation
+            window: Rolling window for volatility and trend
             
         Returns:
-            Array of shape (n_samples, 2) with [returns, volatility]
+            Array of shape (n_samples, 3) with [returns, volatility, trend]
         """
-        # Calculate returns
+        # 1. Daily returns
         returns = prices.pct_change().dropna()
         
-        # Calculate rolling volatility
+        # 2. Volatility
         volatility = returns.rolling(window=window).std().dropna()
         
-        # Align returns and volatility
-        aligned_returns = returns[volatility.index]
+        # 3. Trend (Distance from Simple Moving Average)
+        sma = prices.rolling(window=window).mean()
+        trend = ((prices - sma) / sma).dropna()
+        
+        # Align all series to the same valid dates
+        valid_idx = returns.index.intersection(volatility.index).intersection(trend.index)
+        
+        aligned_returns = returns.loc[valid_idx]
+        aligned_vol = volatility.loc[valid_idx]
+        aligned_trend = trend.loc[valid_idx]
         
         # Combine into feature matrix
         features = np.column_stack([
             aligned_returns.values,
-            volatility.values
+            aligned_vol.values,
+            aligned_trend.values
         ])
         
         return features
@@ -169,28 +179,32 @@ class HMMRegimeDetector:
         # Predict states for entire history to label them
         states = self.model.predict(features)
         
-        # Label states based on mean returns in each state
+        # Label states based on trend logic
         state_means = []
         state_vols = []
+        state_trends = []
         
         for state_idx in range(self.n_states):
             state_mask = states == state_idx
             state_returns = features[state_mask, 0]
             state_volatility = features[state_mask, 1]
+            state_trend = features[state_mask, 2]
             
             state_means.append(state_returns.mean())
             state_vols.append(state_volatility.mean())
+            state_trends.append(state_trend.mean())
+            
+        # Map states to regime labels based primarily on the Trend (which direction we are heading)
+        # Bull: Highest positive trend vs Moving Average
+        # Bear: Lowest negative trend vs Moving Average
+        # Sideways: Middle area
         
-        # Map states to regime labels
-        # Bull: Highest mean return
-        # Bear: Lowest mean return
-        # Sideways: Middle mean return
-        sorted_indices = np.argsort(state_means)
+        sorted_indices = np.argsort(state_trends)
         
         self.state_labels = {
-            sorted_indices[0]: "bear",      # Lowest returns
-            sorted_indices[1]: "sideways",  # Middle returns
-            sorted_indices[2]: "bull"       # Highest returns
+            sorted_indices[0]: "bear",      # Most negative trend
+            sorted_indices[1]: "sideways",  # Middle trend
+            sorted_indices[2]: "bull"       # Most positive trend
         }
         
         if verbose:
@@ -199,7 +213,8 @@ class HMMRegimeDetector:
                 self.logger.info(
                     f"  State {state_idx} = {label.upper()}: "
                     f"mean_return={state_means[state_idx]:.4f}, "
-                    f"mean_vol={state_vols[state_idx]:.4f}"
+                    f"mean_vol={state_vols[state_idx]:.4f}, "
+                    f"mean_trend={state_trends[state_idx]:.4f}"
                 )
         
         self.fitted = True
