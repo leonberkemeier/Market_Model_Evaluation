@@ -59,7 +59,7 @@ def load_market_data(ticker: str, start_date: str, end_date: str) -> pd.Series:
     if HAS_DATA_LOADER:
         try:
             loader = DataLoader()
-            prices_df = loader.load_prices(
+            prices_df = loader.load_stock_prices(
                 ticker, 
                 start_date=datetime.strptime(start_date, "%Y-%m-%d"),
                 end_date=datetime.strptime(end_date, "%Y-%m-%d")
@@ -80,7 +80,11 @@ def load_market_data(ticker: str, start_date: str, end_date: str) -> pd.Series:
                 raise ValueError(f"No data returned for {ticker}")
             
             logger.info(f"Loaded {len(data)} days from yfinance")
-            return data['Close']
+            
+            # yfinance returns MultiIndex if pandas >= 1.3 and yfinance >= 0.2
+            if isinstance(data.columns, pd.MultiIndex):
+                return data['Close'][ticker].squeeze()
+            return data['Close'].squeeze()
             
         except Exception as e:
             logger.error(f"yfinance failed: {e}")
@@ -134,7 +138,7 @@ def train_hmm(
     logger.info(f"  Ticker: {ticker}")
     logger.info(f"  Period: {start_date} to {end_date}")
     logger.info(f"  Days: {len(prices)}")
-    logger.info(f"  Price range: ${prices.min():.2f} - ${prices.max():.2f}")
+    logger.info(f"  Price range: ${float(prices.min()):.2f} - ${float(prices.max()):.2f}")
     
     # Train HMM
     logger.info(f"\nTraining HMM with {n_states} states ({n_iter} iterations)...")

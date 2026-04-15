@@ -149,14 +149,22 @@ class HMMRegimeDetector:
             self.logger.info(f"Feature matrix shape: {features.shape}")
         
         # Initialize and train Gaussian HMM
-        self.model = hmm.GaussianHMM(
-            n_components=self.n_states,
-            covariance_type="full",
-            n_iter=self.n_iter,
-            random_state=self.random_state
-        )
-        
-        self.model.fit(features)
+        for cov_type in ("full", "diag"):
+            try:
+                self.model = hmm.GaussianHMM(
+                    n_components=self.n_states,
+                    covariance_type=cov_type,
+                    n_iter=self.n_iter,
+                    random_state=self.random_state,
+                    min_covar=1e-3
+                )
+                self.model.fit(features)
+                break
+            except ValueError as e:
+                if cov_type == "full":
+                    self.logger.warning(f"HMM full covariance failed ({e}), falling back to diag")
+                else:
+                    raise
         
         # Predict states for entire history to label them
         states = self.model.predict(features)
