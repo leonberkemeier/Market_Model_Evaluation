@@ -51,7 +51,7 @@ class HMMRegimeDetector:
         self.n_states = n_states
         self.n_iter = n_iter
         self.random_state = random_state
-        self.model_path = model_path or Path("models/hmm_regime_model.pkl")
+        self.model_path = model_path or Path("models/hmm_regime_model_14d.pkl")
         
         self.model = None
         self.state_labels = {}  # Maps state index to regime name

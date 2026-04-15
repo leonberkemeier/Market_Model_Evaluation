@@ -140,83 +140,73 @@ def train_hmm(
     logger.info(f"  Days: {len(prices)}")
     logger.info(f"  Price range: ${float(prices.min()):.2f} - ${float(prices.max()):.2f}")
     
-    # Train HMM
-    logger.info(f"\nTraining HMM with {n_states} states ({n_iter} iterations)...")
-    
-    detector = HMMRegimeDetector(
+    # Train HMM (14-Day Model)
+    logger.info(f"\nTraining 14-Day (Short-Term) HMM with {n_states} states ({n_iter} iterations)...")
+    detector_14d = HMMRegimeDetector(
         n_states=n_states,
         n_iter=n_iter,
         random_state=42,
-        model_path=Path(model_path)
+        model_path=Path(str(model_path).replace(".pkl", "_14d.pkl"))
     )
     
     try:
-        detector.fit(prices, verbose=True)
+        detector_14d.fit(prices, window=14, verbose=False)
     except Exception as e:
-        logger.error(f"Training failed: {e}")
+        logger.error(f"14-Day Training failed: {e}")
+        sys.exit(1)
+        
+    # Train HMM (60-Day Model)
+    logger.info(f"\nTraining 60-Day (Long-Term) HMM with {n_states} states ({n_iter} iterations)...")
+    detector_60d = HMMRegimeDetector(
+        n_states=n_states,
+        n_iter=n_iter,
+        random_state=42,
+        model_path=Path(str(model_path).replace(".pkl", "_60d.pkl"))
+    )
+    
+    try:
+        detector_60d.fit(prices, window=60, verbose=False)
+    except Exception as e:
+        logger.error(f"60-Day Training failed: {e}")
         sys.exit(1)
     
-    # Get regime statistics
-    logger.info("\n" + "=" * 60)
-    logger.info("Regime Statistics")
-    logger.info("=" * 60)
-    
-    stats = detector.get_regime_statistics(prices)
-    
-    for regime, metrics in stats.items():
-        logger.info(f"\n{regime.upper()} Regime:")
-        logger.info(f"  Mean Daily Return: {metrics.get('mean_return', 0.0):.4f} ({metrics.get('mean_return', 0.0)*252:.1%} annualized)")
+    # Define a helper function to print statistics
+    def print_stats(title, detector, window):
+        logger.info("\n" + "=" * 60)
+        logger.info(title)
+        logger.info("=" * 60)
         
-        # Check if dual-timeframe stats exist
-        if 'short_volatility' in metrics and 'long_volatility' in metrics:
-            logger.info(f"  Short Volatility (14d): {metrics['short_volatility']:.4f} ({metrics['short_volatility']*np.sqrt(252):.1%} annualized)")
-            logger.info(f"  Long Volatility (60d):  {metrics['long_volatility']:.4f} ({metrics['long_volatility']*np.sqrt(252):.1%} annualized)")
-        else:
+        stats = detector.get_regime_statistics(prices, window=window)
+        for regime, metrics in stats.items():
+            logger.info(f"\n{regime.upper()} Regime:")
+            logger.info(f"  Mean Daily Return: {metrics.get('mean_return', 0.0):.4f} ({metrics.get('mean_return', 0.0)*252:.1%} annualized)")
             logger.info(f"  Volatility: {metrics.get('volatility', 0.0):.4f} ({metrics.get('volatility', 0.0)*np.sqrt(252):.1%} annualized)")
-            
-        logger.info(f"  Frequency: {metrics.get('frequency', 0.0):.1%}")
-        logger.info(f"  Avg Duration: {metrics.get('avg_duration_days', 0.0):.1f} days")
-        logger.info(f"  Max Duration: {metrics.get('max_duration_days', 0.0):.0f} days")
+            logger.info(f"  Frequency: {metrics.get('frequency', 0.0):.1%}")
+            logger.info(f"  Avg Duration: {metrics.get('avg_duration_days', 0.0):.1f} days")
+
+    # Get regime statistics for both
+    print_stats("Regime Statistics: 14-Day (Short-Term)", detector_14d, 14)
+    print_stats("Regime Statistics: 60-Day (Long-Term)", detector_60d, 60)
     
-    # Analyze the most recent state by breaking down how the timeline looks
-    # We will pass dummy arrays into a mock single prediction to show isolated timelines
+    # Current regime mapping
+    current_regime_14d = detector_14d.predict_regime(prices, window=14, return_probabilities=True)
+    current_regime_60d = detector_60d.predict_regime(prices, window=60, return_probabilities=True)
     
-    long_only = HMMRegimeDetector(n_states=3, n_iter=100, random_state=42)
-    short_only = HMMRegimeDetector(n_states=3, n_iter=100, random_state=42)
-    
-    current_regime = detector.predict_regime(prices, return_probabilities=True)
     logger.info("\n" + "=" * 60)
     logger.info("Current Market Regime (as of training end)")
     logger.info("=" * 60)
-    logger.info(f"  Dual-Timeframe Output:")
-    logger.info(f"  Regime: {current_regime['regime'].upper()}")
-    logger.info(f"  Confidence: {current_regime['confidence']:.1%}")
-    logger.info(f"  Probabilities:")
-    for regime, prob in current_regime['probabilities'].items():
-        logger.info(f"    {regime.capitalize():10s} {prob:.1%}")
-        
-    try:
-        short_only.fit(prices, short_window=14, long_window=14, verbose=False)
-        long_only.fit(prices, short_window=60, long_window=60, verbose=False)
-        s_cur = short_only.predict_regime(prices, short_window=14, long_window=14)
-        l_cur = long_only.predict_regime(prices, short_window=60, long_window=60)
-        
-        logger.info("\n" + "-" * 60)
-        logger.info("  Isolated Timeline Analysis:")
-        logger.info(f"    Short Timeline Only (14d): {s_cur['regime'].upper()}")
-        logger.info(f"    Long Timeline Only (60d):  {l_cur['regime'].upper()}")
-    except Exception:
-        pass
-        logger.info(f"    {regime.capitalize():10s} {prob:.1%}")
+    logger.info(f"  [14-Day Model]: {current_regime_14d['regime'].upper()} (Confidence: {current_regime_14d['confidence']:.1%})")
+    logger.info(f"  [60-Day Model]: {current_regime_60d['regime'].upper()} (Confidence: {current_regime_60d['confidence']:.1%})")
     
     # Validation
     if validate:
         logger.info("\n" + "=" * 60)
-        logger.info("Validation")
+        logger.info("Validation (Against 14-Day Short-Term Model)")
         logger.info("=" * 60)
         
-        # Get regime history
-        history = detector.predict_regime_history(prices)
+        # Get regime history against the short-term
+        detector = detector_14d
+        history = detector.predict_regime_history(prices, window=14)
         
         # Calculate average confidence per regime
         for regime in ["bull", "bear", "sideways"]:

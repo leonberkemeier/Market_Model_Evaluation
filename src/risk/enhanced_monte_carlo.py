@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from loguru import logger
 from datetime import datetime
 
-from .markov_chain_detector import MarkovRegimeState, MarkovChainRegimeDetector
+from ..regime.markov_chain_detector import MarkovRegimeState, MarkovChainRegimeDetector
 
 
 @dataclass
